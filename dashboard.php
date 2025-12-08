@@ -1,70 +1,90 @@
 <?php
 /**
- * DASHBOARD.PHP - Enterprise Edition
- * Inclusief werkende links naar Create & Edit modules.
+ * DASHBOARD.PHP
+ * Inclusief: Direct toewijzen van teamleiders aan openstaande gesprekken.
  */
 
-// 1. CONFIGURATIE & DATABASE
 require_once __DIR__ . '/config/config.php';
 require_once __DIR__ . '/config/db.php';
 
-// 2. BEVEILIGING
+// 1. BEVEILIGING
 if (!isset($_SESSION['user_id'])) {
     header("Location: login.php");
     exit;
 }
-// Data integriteit check
 if (!isset($_SESSION['role']) || !isset($_SESSION['email'])) {
     session_destroy();
     header("Location: login.php?error=session_expired");
     exit;
 }
 
-// 3. VARIABELEN
-$userEmail = $_SESSION['email'];
-$userRole  = ucfirst($_SESSION['role']);
+// 2. LOGICA: TOEWIJZING VERWERKEN (POST)
+// Dit stukje code luistert of er op het 'opslaan' icoontje is geklikt
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['assign_user_id']) && isset($_POST['form_id'])) {
+    try {
+        $stmt = $pdo->prepare("UPDATE feedback_forms SET assigned_to_user_id = ? WHERE id = ?");
+        $stmt->execute([$_POST['assign_user_id'], $_POST['form_id']]);
+        
+        // Pagina verversen om de wijziging te tonen
+        header("Location: dashboard.php?msg=assigned");
+        exit;
+    } catch (PDOException $e) {
+        // Foutafhandeling (in productie loggen)
+    }
+}
 
-// Meldingen afvangen (bijv. na opslaan)
+// 3. DATA OPHALEN
+$userEmail = $_SESSION['email'];
 $msg = $_GET['msg'] ?? '';
 
-// 4. DATA OPHALEN
+// Statistieken
 $stats = ['drivers' => 0, 'open_feedback' => 0];
-$recentActivities = [];
-
 try {
-    // Statistieken tellen
     $stats['drivers'] = $pdo->query("SELECT COUNT(*) FROM drivers")->fetchColumn();
     $stats['open_feedback'] = $pdo->query("SELECT COUNT(*) FROM feedback_forms WHERE status = 'open'")->fetchColumn();
+} catch (PDOException $e) {}
 
-    // Recente activiteiten ophalen
-    $sqlRecent = "SELECT f.id, f.form_date, d.name as driver_name, u.email as creator_email, f.status 
-                  FROM feedback_forms f
-                  JOIN drivers d ON f.driver_id = d.id
-                  JOIN users u ON f.created_by_user_id = u.id
-                  ORDER BY f.updated_at DESC, f.created_at DESC 
-                  LIMIT 5";
-    $recentActivities = $pdo->query($sqlRecent)->fetchAll();
+// Lijst met Teamleiders (voor de dropdown)
+$teamleads = [];
+try {
+    $teamleads = $pdo->query("SELECT id, email FROM users ORDER BY email ASC")->fetchAll();
+} catch (PDOException $e) {}
 
-} catch (PDOException $e) {
-    // In productie loggen we dit stil
-}
+// Recente Activiteiten (Met JOIN om te zien aan wie het is toegewezen)
+$recentActivities = [];
+try {
+    $sql = "SELECT 
+                f.id, 
+                f.form_date, 
+                f.status, 
+                f.assigned_to_user_id,
+                d.name as driver_name, 
+                u_creator.email as creator_email,
+                u_assigned.email as assigned_email
+            FROM feedback_forms f
+            JOIN drivers d ON f.driver_id = d.id
+            JOIN users u_creator ON f.created_by_user_id = u_creator.id
+            LEFT JOIN users u_assigned ON f.assigned_to_user_id = u_assigned.id
+            ORDER BY f.created_at DESC 
+            LIMIT 10";
+    $recentActivities = $pdo->query($sql)->fetchAll();
+} catch (PDOException $e) {}
+
 ?>
 <!DOCTYPE html>
 <html lang="nl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard | Chauffeurs Dossier</title>
-    
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;600;700&display=swap" rel="stylesheet">
 
     <style>
-        /* --- ENTERPRISE THEME (Consistent met andere pagina's) --- */
+        /* --- ENTERPRISE THEME --- */
         :root {
-            --brand-color: #0176d3;       /* Salesforce Blue */
+            --brand-color: #0176d3;
             --brand-dark: #014486;
-            --sidebar-bg: #1a2233;        /* Oracle Dark */
+            --sidebar-bg: #1a2233;
             --bg-body: #f3f2f2;
             --text-main: #181818;
             --text-secondary: #706e6b;
@@ -88,89 +108,66 @@ try {
         /* MAIN CONTENT */
         .main-content { flex-grow: 1; display: flex; flex-direction: column; overflow-y: auto; }
         
-        /* HEADER */
         .top-header { height: 60px; background: white; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; padding: 0 24px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); position: sticky; top: 0; z-index: 10; }
-        .search-bar input { padding: 8px 12px 8px 35px; border: 1px solid var(--border-color); border-radius: 4px; width: 300px; background-color: #fff; }
-        .user-profile { display: flex; align-items: center; gap: 12px; }
-        .avatar-circle { width: 32px; height: 32px; background-color: var(--brand-color); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 14px; }
+        .search-bar input { padding: 8px 12px 8px 35px; border: 1px solid var(--border-color); border-radius: 4px; width: 300px; }
+        .user-profile { display: flex; align-items: center; gap: 12px; font-size: 13px; font-weight: 600; }
 
-        /* PAGINA INHOUD */
         .page-body { padding: 24px; max-width: 1400px; margin: 0 auto; width: 100%; }
-        .page-title-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
-        .page-title h1 { margin: 0; font-size: 24px; color: var(--text-main); }
-        .page-subtitle { color: var(--text-secondary); font-size: 13px; margin-top: 4px; }
+        
+        /* ALERTS */
+        .alert-toast { background: var(--success-bg); color: var(--success-text); padding: 10px 15px; border-radius: 4px; margin-bottom: 20px; font-size: 14px; border: 1px solid #a7f3d0; display: flex; align-items: center; gap: 10px; }
 
         /* BUTTONS */
-        .btn { padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 13px; font-weight: 600; border: 1px solid transparent; cursor: pointer; transition: 0.2s; display: inline-flex; align-items: center; gap: 6px; }
-        .btn-neutral { background: white; border: 1px solid var(--border-color); color: var(--brand-color); }
+        .btn { padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; transition: 0.2s; }
         .btn-brand { background: var(--brand-color); color: white; }
-        .btn:hover { opacity: 0.9; }
+        .btn-brand:hover { background: var(--brand-dark); }
+        .btn-neutral { background: white; border: 1px solid var(--border-color); color: var(--brand-color); }
 
         /* CARDS & GRID */
         .grid-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; margin-bottom: 24px; }
         .card { background: white; border: 1px solid var(--border-color); border-radius: 4px; box-shadow: var(--card-shadow); }
-        .card-header { padding: 12px 16px; border-bottom: 1px solid var(--border-color); background-color: #fcfcfc; display: flex; justify-content: space-between; align-items: center; }
-        .card-header h2 { margin: 0; font-size: 14px; font-weight: 700; color: var(--text-main); text-transform: uppercase; letter-spacing: 0.5px; }
         .card-body { padding: 16px; }
+        .card-header { padding: 12px 16px; border-bottom: 1px solid var(--border-color); background-color: #fcfcfc; display: flex; justify-content: space-between; align-items: center; }
+        .card-header h2 { margin: 0; font-size: 14px; font-weight: 700; color: var(--text-main); text-transform: uppercase; }
 
         /* KPI */
         .kpi-value { font-size: 32px; font-weight: 300; color: var(--text-main); margin-bottom: 4px; }
         .kpi-label { font-size: 13px; color: var(--text-secondary); }
 
-        /* TABLES */
+        /* TABLE */
         table { width: 100%; border-collapse: collapse; font-size: 13px; }
-        th { text-align: left; color: var(--text-secondary); padding: 8px; border-bottom: 1px solid var(--border-color); font-weight: 600; font-size: 12px; text-transform: uppercase; }
-        td { padding: 12px 8px; border-bottom: 1px solid #eee; color: var(--text-main); }
-        tr:last-child td { border-bottom: none; }
+        th { text-align: left; padding: 10px; border-bottom: 1px solid var(--border-color); color: var(--text-secondary); font-weight: 600; text-transform: uppercase; font-size: 11px; }
+        td { padding: 10px; border-bottom: 1px solid #eee; color: var(--text-main); vertical-align: middle; }
         
-        .status-badge { padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; display: inline-block; }
+        .status-badge { padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
         .status-open { background: #fff0b5; color: #744f05; }
         .status-completed { background: #c1f0d3; color: #0c4d26; }
-        
-        /* ALERTS */
-        .alert-toast { background: var(--success-bg); color: var(--success-text); padding: 10px 15px; border-radius: 4px; margin-bottom: 20px; font-size: 14px; border: 1px solid #a7f3d0; display: flex; align-items: center; gap: 10px; }
+
+        /* ASSIGN FORM STYLES */
+        .assign-select { padding: 5px; border: 1px solid #ccc; border-radius: 4px; font-size: 12px; max-width: 150px; }
+        .btn-icon-save { background: none; border: none; cursor: pointer; color: var(--brand-color); margin-left: 5px; padding: 4px; border-radius: 4px; }
+        .btn-icon-save:hover { background-color: #e0e7ff; }
 
     </style>
 </head>
 <body>
 
     <aside class="sidebar">
-        <div class="sidebar-header">
-            <span>LogistiekApp</span>
-        </div>
+        <div class="sidebar-header">LogistiekApp</div>
         <ul class="nav-list">
             <li class="nav-item">
                 <a href="dashboard.php" class="active">
-                    <span class="material-icons-outlined">dashboard</span>
-                    Dashboard
+                    <span class="material-icons-outlined">dashboard</span> Dashboard
                 </a>
             </li>
             <li class="nav-item">
-                <a href="#">
-                    <span class="material-icons-outlined">people</span>
-                    Chauffeurs
+                <a href="feedback_form.php">
+                    <span class="material-icons-outlined">add_circle</span> Nieuw Gesprek
                 </a>
             </li>
             <li class="nav-item">
-                <a href="feedback_create.php">
-                    <span class="material-icons-outlined">assignment</span>
-                    Feedback
-                </a>
+                <a href="#"><span class="material-icons-outlined">people</span> Chauffeurs</a>
             </li>
-            <li class="nav-item">
-                <a href="#">
-                    <span class="material-icons-outlined">bar_chart</span>
-                    Rapportages
-                </a>
-            </li>
-            <?php if($_SESSION['role'] === 'admin'): ?>
-            <li class="nav-item">
-                <a href="#">
-                    <span class="material-icons-outlined">settings</span>
-                    Beheer
-                </a>
-            </li>
-            <?php endif; ?>
         </ul>
     </aside>
 
@@ -178,43 +175,37 @@ try {
         
         <header class="top-header">
             <div class="search-bar">
-                <input type="text" placeholder="Zoek dossier, chauffeur of ID...">
+                <input type="text" placeholder="Zoek op naam, ID of status...">
             </div>
             <div class="user-profile">
-                <span class="material-icons-outlined" style="color:#706e6b; cursor:pointer;">notifications</span>
-                <span style="font-size: 13px; font-weight: 600;"><?php echo htmlspecialchars($userEmail); ?></span>
-                <div class="avatar-circle">
-                    <?php echo strtoupper(substr($userEmail, 0, 1)); ?>
-                </div>
-                <a href="logout.php" class="material-icons-outlined" style="color: var(--text-secondary); text-decoration:none; margin-left: 10px;" title="Uitloggen">logout</a>
+                <span class="material-icons-outlined" style="margin-right: 8px;">account_circle</span>
+                <?php echo htmlspecialchars($userEmail); ?>
+                <a href="logout.php" title="Uitloggen" style="margin-left: 15px; color: var(--text-secondary); text-decoration: none;">
+                    <span class="material-icons-outlined" style="font-size: 20px; vertical-align: middle;">logout</span>
+                </a>
             </div>
         </header>
 
         <div class="page-body">
             
             <?php if ($msg === 'created'): ?>
-                <div class="alert-toast">
-                    <span class="material-icons-outlined">check_circle</span> 
-                    Nieuw gesprek succesvol aangemaakt!
-                </div>
+                <div class="alert-toast"><span class="material-icons-outlined">check_circle</span> Gesprek succesvol aangemaakt!</div>
+            <?php elseif ($msg === 'saved'): ?>
+                <div class="alert-toast"><span class="material-icons-outlined">save</span> Wijzigingen opgeslagen.</div>
+            <?php elseif ($msg === 'assigned'): ?>
+                <div class="alert-toast"><span class="material-icons-outlined">person_add</span> Teamleider toegewezen.</div>
             <?php elseif ($msg === 'completed'): ?>
-                <div class="alert-toast">
-                    <span class="material-icons-outlined">check_circle</span> 
-                    Dossier succesvol afgerond en opgeslagen.
-                </div>
+                <div class="alert-toast"><span class="material-icons-outlined">done_all</span> Dossier afgerond!</div>
             <?php endif; ?>
 
-            <div class="page-title-row">
-                <div class="page-title">
-                    <h1>Dashboard</h1>
-                    <div class="page-subtitle">Overzicht van prestaties en taken • Vandaag</div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                <div>
+                    <h1 style="margin: 0; font-size: 24px; color: var(--text-main);">Dashboard</h1>
+                    <div style="color: var(--text-secondary); font-size: 13px; margin-top: 4px;">Overzicht van prestaties en taken</div>
                 </div>
-                <div class="page-actions">
-                    <a href="#" class="btn btn-neutral">Rapport Downloaden</a>
-                    
-                    <a href="feedback_create.php" class="btn btn-brand">
-                        <span class="material-icons-outlined" style="font-size: 16px;">add</span>
-                        Nieuw Gesprek
+                <div>
+                    <a href="feedback_form.php" class="btn btn-brand">
+                        <span class="material-icons-outlined" style="font-size: 18px;">add</span> Nieuw Gesprek
                     </a>
                 </div>
             </div>
@@ -238,69 +229,74 @@ try {
                         <div class="kpi-label">Team OTD Score</div>
                     </div>
                 </div>
-                <div class="card">
-                    <div class="card-body">
-                        <div class="kpi-value">4</div>
-                        <div class="kpi-label">Mijn Taken</div>
-                    </div>
-                </div>
             </div>
 
             <div class="card">
                 <div class="card-header">
-                    <h2>Recente Feedback Dossiers</h2>
-                    <a href="#" style="font-size: 12px; color: var(--brand-color); text-decoration: none;">Alles bekijken</a>
+                    <h2>Recente Dossiers & Planning</h2>
                 </div>
-                <div class="card-body" style="padding: 0;">
-                    <?php if (empty($recentActivities)): ?>
-                        <div style="padding: 20px; text-align: center; color: var(--text-secondary);">
-                            Geen recente activiteiten gevonden. Start een nieuw gesprek!
-                        </div>
-                    <?php else: ?>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Datum</th>
-                                    <th>Chauffeur</th>
-                                    <th>Aangemaakt Door</th>
-                                    <th>Status</th>
-                                    <th style="text-align: right;">Actie</th>
-                                </tr>
-                            </thead>
-                            <tbody>
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%;">
+                        <thead>
+                            <tr>
+                                <th>Datum</th>
+                                <th>Chauffeur</th>
+                                <th>Gemaakt Door</th>
+                                <th>Status</th>
+                                <th style="min-width: 200px;">Toegewezen Aan</th> <th style="text-align: right;">Actie</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if (empty($recentActivities)): ?>
+                                <tr><td colspan="6" style="text-align:center; padding: 20px;">Geen gegevens gevonden.</td></tr>
+                            <?php else: ?>
                                 <?php foreach ($recentActivities as $row): ?>
                                 <tr>
                                     <td><?php echo htmlspecialchars($row['form_date']); ?></td>
-                                    <td>
-                                        <a href="feedback_form.php?id=<?php echo $row['id']; ?>" style="color: var(--brand-color); text-decoration: none; font-weight: 600;">
-                                            <?php echo htmlspecialchars($row['driver_name']); ?>
-                                        </a>
-                                    </td>
+                                    <td><strong><?php echo htmlspecialchars($row['driver_name']); ?></strong></td>
                                     <td><?php echo htmlspecialchars($row['creator_email']); ?></td>
                                     <td>
-                                        <?php $sClass = ($row['status'] == 'open') ? 'status-open' : 'status-completed'; ?>
-                                        <span class="status-badge <?php echo $sClass; ?>">
-                                            <?php echo htmlspecialchars($row['status']); ?>
+                                        <span class="status-badge <?php echo ($row['status'] === 'open') ? 'status-open' : 'status-completed'; ?>">
+                                            <?php echo ucfirst($row['status']); ?>
                                         </span>
                                     </td>
+                                    
+                                    <td>
+                                        <?php if (!empty($row['assigned_to_user_id'])): ?>
+                                            <div style="display: flex; align-items: center; gap: 5px; color: #333;">
+                                                <span class="material-icons-outlined" style="font-size: 16px; color: var(--brand-color);">person</span>
+                                                <?php echo htmlspecialchars($row['assigned_email']); ?>
+                                            </div>
+                                        <?php else: ?>
+                                            <form method="POST" style="display: flex; align-items: center;">
+                                                <input type="hidden" name="form_id" value="<?php echo $row['id']; ?>">
+                                                <select name="assign_user_id" class="assign-select" required>
+                                                    <option value="">-- Kies --</option>
+                                                    <?php foreach ($teamleads as $lead): ?>
+                                                        <option value="<?php echo $lead['id']; ?>"><?php echo htmlspecialchars($lead['email']); ?></option>
+                                                    <?php endforeach; ?>
+                                                </select>
+                                                <button type="submit" class="btn-icon-save" title="Opslaan">
+                                                    <span class="material-icons-outlined" style="font-size: 18px;">save</span>
+                                                </button>
+                                            </form>
+                                        <?php endif; ?>
+                                    </td>
+
                                     <td style="text-align: right;">
-                                        <a href="feedback_form.php?id=<?php echo $row['id']; ?>" title="Bewerken" style="text-decoration: none;">
-                                            <span class="material-icons-outlined" style="font-size: 18px; color: var(--text-secondary); cursor: pointer;">edit</span>
+                                        <a href="feedback_form.php?id=<?php echo $row['id']; ?>" style="color: var(--brand-color); text-decoration: none; font-weight: 600;">
+                                            Bewerken &rarr;
                                         </a>
                                     </td>
                                 </tr>
                                 <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    <?php endif; ?>
-                </div>
-                <div class="card-footer" style="padding: 10px; border-top: 1px solid var(--border-color); text-align: center;">
-                    <a href="#" style="font-size: 12px; color: var(--brand-color); text-decoration: none;">Toon meer</a>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
         </div>
     </main>
-
 </body>
 </html>
