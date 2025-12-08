@@ -284,8 +284,7 @@ try {
                                     </td>
 
                                     <td style="text-align: right;">
-                                        <a href="feedback_form.php?id=<?php echo $row['id']; ?>" style="color: var(--brand-color); text-decoration: none; font-weight: 600;">
-                                            Bewerken &rarr;
+<a href="feedback_view.php?id=<?php echo $row['id']; ?>" style="color: var(--brand-color); text-decoration: none; font-weight: 600;">                                            Bewerken &rarr;
                                         </a>
                                     </td>
                                 </tr>
