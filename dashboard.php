@@ -3,31 +3,38 @@
 require_once 'config/config.php';
 require_once 'config/db.php';
 
-// BEVEILIGING: Alleen ingelogde gebruikers
+// 1. BEVEILIGING: Check of de gebruiker is ingelogd
 if (!isset($_SESSION['user_id'])) {
     header("Location: login.php");
     exit;
 }
 
+// 2. DATA INTEGRITEIT CHECK (Dit lost jouw error op!)
+// Als 'role' of 'email' mist in de sessie, is de login corrupt.
+if (!isset($_SESSION['role']) || !isset($_SESSION['email'])) {
+    // Stuur door naar uitloggen om de foutieve sessie te wissen
+    header("Location: logout.php");
+    exit;
+}
+
+// 3. Variabelen instellen voor gebruik in de HTML
 $user_id = $_SESSION['user_id'];
 $user_role = $_SESSION['role'];
 $user_email = $_SESSION['email'];
 
-// DATA OPHALEN: Voorbeeld statistieken
+// ... hieronder volgt de rest van je PHP logica (zoals statistieken ophalen) ...
 try {
-    // Tel totaal aantal chauffeurs
     $stmtDrivers = $pdo->query("SELECT COUNT(*) FROM drivers");
     $countDrivers = $stmtDrivers->fetchColumn();
-
-    // Tel openstaande feedback formulieren
+    
     $stmtForms = $pdo->query("SELECT COUNT(*) FROM feedback_forms WHERE status = 'open'");
     $countOpenForms = $stmtForms->fetchColumn();
-
 } catch (PDOException $e) {
     $countDrivers = 0;
     $countOpenForms = 0;
 }
 ?>
+<!DOCTYPE html>
 
 <!DOCTYPE html>
 <html lang="nl">
