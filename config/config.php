@@ -13,7 +13,7 @@ define('DB_PASS', 'Mango2025!@');     // Vaak leeg op lokale servers, anders inv
 // Basis URL van de applicatie (handig voor links)
 // Pas dit aan als je map anders heet of online staat
 define('BASE_URL', 'http://172.21.24.76/feedback');
-/ Tijdzone instellen op Nederland
+// Tijdzone instellen op Nederland
 date_default_timezone_set('Europe/Amsterdam');
 
 // Foutmeldingen tonen (zet dit op 0 als de site live gaat!)
