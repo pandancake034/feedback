@@ -1,112 +1,294 @@
 <?php
-// dashboard.php
-require_once 'config/config.php';
-require_once 'config/db.php';
+/**
+ * DASHBOARD.PHP
+ * Hoofdpagina van de applicatie.
+ * * Best Practices toegepast:
+ * 1. Strict Type & Error Handling (Try-Catch)
+ * 2. Separation of Concerns (Logica boven, View beneden)
+ * 3. Security (htmlspecialchars tegen XSS, sessie validatie)
+ */
 
-// 1. BEVEILIGING: Check of de gebruiker is ingelogd
+// 1. Configuratie & Database laden
+require_once __DIR__ . '/config/config.php'; // Gebruik __DIR__ voor absoluut pad
+require_once __DIR__ . '/config/db.php';     // Database verbinding
+
+// 2. Beveiliging: Sessie controle
 if (!isset($_SESSION['user_id'])) {
     header("Location: login.php");
     exit;
 }
 
-// 2. DATA INTEGRITEIT CHECK (Dit lost jouw error op!)
-// Als 'role' of 'email' mist in de sessie, is de login corrupt.
+// 3. Data Integriteit: Check of cruciale sessie data bestaat
+// Dit voorkomt de "Undefined array key" fouten die je eerder had
 if (!isset($_SESSION['role']) || !isset($_SESSION['email'])) {
-    // Stuur door naar uitloggen om de foutieve sessie te wissen
-    header("Location: logout.php");
+    session_destroy();
+    header("Location: login.php?error=session_expired");
     exit;
 }
 
-// 3. Variabelen instellen voor gebruik in de HTML
-$user_id = $_SESSION['user_id'];
-$user_role = $_SESSION['role'];
-$user_email = $_SESSION['email'];
+// Variabelen voor de view
+$userId    = $_SESSION['user_id'];
+$userEmail = $_SESSION['email'];
+$userRole  = ucfirst($_SESSION['role']); // Eerste letter hoofdletter (admin -> Admin)
 
-// ... hieronder volgt de rest van je PHP logica (zoals statistieken ophalen) ...
+// 4. Data Ophalen (Statistieken)
+// We gebruiken try-catch blokken zodat het dashboard blijft werken, zelfs als een query faalt.
+$stats = [
+    'drivers' => 0,
+    'open_feedback' => 0,
+    'my_reviews' => 0
+];
+
+$recentActivities = [];
+
 try {
-    $stmtDrivers = $pdo->query("SELECT COUNT(*) FROM drivers");
-    $countDrivers = $stmtDrivers->fetchColumn();
-    
-    $stmtForms = $pdo->query("SELECT COUNT(*) FROM feedback_forms WHERE status = 'open'");
-    $countOpenForms = $stmtForms->fetchColumn();
-} catch (PDOException $e) {
-    $countDrivers = 0;
-    $countOpenForms = 0;
-}
-?>
-<!DOCTYPE html>
+    // Totaal aantal chauffeurs
+    $stmt = $pdo->query("SELECT COUNT(*) FROM drivers");
+    $stats['drivers'] = $stmt->fetchColumn();
 
+    // Openstaande feedback formulieren
+    $stmt = $pdo->query("SELECT COUNT(*) FROM feedback_forms WHERE status = 'open'");
+    $stats['open_feedback'] = $stmt->fetchColumn();
+
+    // Recente feedback ophalen (met JOIN om namen te tonen i.p.v. ID's)
+    // Dit is een 'best practice' query: haal alleen op wat je nodig hebt (LIMIT 5)
+    $sqlRecent = "
+        SELECT 
+            f.id, 
+            f.form_date, 
+            d.name as driver_name, 
+            u.email as creator_email,
+            f.status 
+        FROM feedback_forms f
+        JOIN drivers d ON f.driver_id = d.id
+        JOIN users u ON f.created_by_user_id = u.id
+        ORDER BY f.created_at DESC 
+        LIMIT 5
+    ";
+    $recentActivities = $pdo->query($sqlRecent)->fetchAll();
+
+} catch (PDOException $e) {
+    // In productie log je dit naar een bestand, niet naar het scherm
+    $dbError = "Kon statistieken niet laden.";
+}
+
+?>
 <!DOCTYPE html>
 <html lang="nl">
 <head>
     <meta charset="UTF-8">
-    <title>Dashboard - Chauffeurs Dossier</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard | Chauffeurs Dossier</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background-color: #f4f6f9; margin: 0; }
-        
-        /* Navigatie */
-        nav { background-color: #343a40; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; }
-        nav h1 { margin: 0; font-size: 20px; font-weight: 500; }
-        .nav-links a { color: #ccc; text-decoration: none; margin-left: 20px; }
-        .nav-links a:hover { color: white; }
-        .logout-btn { background-color: #dc3545; padding: 8px 15px; border-radius: 4px; color: white !important; }
+        /* --- CSS VARIABLES (Theming) --- */
+        :root {
+            --primary: #2563eb;       /* Modern Blauw */
+            --primary-dark: #1e40af;
+            --secondary: #64748b;     /* Grijs-blauw voor tekst */
+            --bg-body: #f1f5f9;       /* Lichte achtergrond */
+            --bg-card: #ffffff;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
 
-        /* Container */
-        .container { padding: 30px; max-width: 1000px; margin: 0 auto; }
-        
-        /* Welkomstkaart */
-        .welcome-card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; border-left: 5px solid #007bff; }
-        
-        /* Grid voor statistieken */
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
-        .stat-card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); text-align: center; }
-        .stat-number { font-size: 32px; font-weight: bold; color: #007bff; display: block; margin-bottom: 5px; }
-        .stat-label { color: #666; font-size: 14px; }
+        /* --- RESET & BASIS --- */
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-body);
+            color: #1e293b;
+            margin: 0;
+            padding-bottom: 40px;
+        }
 
-        /* Actieknoppen */
-        .actions { margin-top: 30px; }
-        .btn { display: inline-block; padding: 10px 20px; background: #007bff; color: white; text-decoration: none; border-radius: 5px; margin-right: 10px; }
-        .btn:hover { background: #0056b3; }
+        /* --- NAVIGATIE --- */
+        .navbar {
+            background-color: var(--bg-card);
+            border-bottom: 1px solid #e2e8f0;
+            padding: 0.75rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .navbar-brand { font-weight: 700; font-size: 1.25rem; color: var(--primary); display: flex; align-items: center; gap: 10px;}
+        .navbar-user { display: flex; align-items: center; gap: 15px; font-size: 0.9rem; }
+        .role-badge { 
+            background: #e0e7ff; color: var(--primary); 
+            padding: 4px 8px; border-radius: 4px; 
+            font-size: 0.75rem; font-weight: 600; text-transform: uppercase; 
+        }
+        .btn-logout {
+            color: var(--secondary); text-decoration: none; border: 1px solid #cbd5e1;
+            padding: 6px 12px; border-radius: 6px; transition: all 0.2s;
+        }
+        .btn-logout:hover { background-color: #f8fafc; color: var(--danger); border-color: var(--danger); }
+
+        /* --- LAYOUT CONTAINER --- */
+        .container { max-width: 1200px; margin: 2rem auto; padding: 0 1rem; }
+
+        /* --- GRID SYSTEEM --- */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        /* --- KAARTEN (CARDS) --- */
+        .card {
+            background: var(--bg-card);
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            padding: 1.5rem;
+            border: 1px solid #e2e8f0;
+        }
+        
+        /* Stat Cards specifiek */
+        .stat-card { display: flex; align-items: center; justify-content: space-between; }
+        .stat-info h3 { margin: 0; font-size: 0.875rem; color: var(--secondary); font-weight: 500; }
+        .stat-info .value { font-size: 2rem; font-weight: 700; color: #0f172a; margin-top: 5px; display: block; }
+        .stat-icon { 
+            width: 48px; height: 48px; border-radius: 12px; 
+            background: #eff6ff; color: var(--primary);
+            display: flex; align-items: center; justify-content: center; font-size: 1.5rem;
+        }
+
+        /* --- TABELLEN --- */
+        .table-container { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        th { text-align: left; padding: 12px; border-bottom: 2px solid #e2e8f0; color: var(--secondary); font-weight: 600; }
+        td { padding: 12px; border-bottom: 1px solid #e2e8f0; vertical-align: middle; }
+        tr:last-child td { border-bottom: none; }
+        
+        /* Status Labels */
+        .status-badge {
+            padding: 4px 8px; border-radius: 99px; font-size: 0.75rem; font-weight: 600;
+        }
+        .status-open { background-color: #fef3c7; color: #b45309; } /* Geel/Oranje */
+        .status-completed { background-color: #d1fae5; color: #065f46; } /* Groen */
+
+        /* --- ACTIE KNOPPEN --- */
+        .action-bar { display: flex; gap: 1rem; margin-bottom: 2rem; }
+        .btn-primary {
+            background-color: var(--primary); color: white; text-decoration: none;
+            padding: 10px 20px; border-radius: 8px; font-weight: 500;
+            display: inline-flex; align-items: center; gap: 8px;
+            transition: background 0.2s; box-shadow: 0 2px 4px rgba(37,99,235,0.2);
+        }
+        .btn-primary:hover { background-color: var(--primary-dark); }
+        
+        /* Welkomst Header */
+        .page-header { margin-bottom: 2rem; }
+        .page-header h1 { margin: 0 0 0.5rem 0; font-size: 1.8rem; }
+        .page-header p { margin: 0; color: var(--secondary); }
     </style>
 </head>
 <body>
 
-    <nav>
-        <h1>Chauffeurs Dossier</h1>
-        <div class="nav-links">
-            <span>Ingelogd als: <strong><?php echo htmlspecialchars($user_email); ?></strong> (<?php echo ucfirst($user_role); ?>)</span>
-            <a href="logout.php" class="logout-btn">Uitloggen</a>
+    <nav class="navbar">
+        <div class="navbar-brand">
+            <span>🚛</span> Chauffeurs Dossier
+        </div>
+        <div class="navbar-user">
+            <span>
+                <?php echo htmlspecialchars($userEmail); ?> 
+                <span class="role-badge"><?php echo htmlspecialchars($userRole); ?></span>
+            </span>
+            <a href="logout.php" class="btn-logout">Uitloggen</a>
         </div>
     </nav>
 
     <div class="container">
         
-        <div class="welcome-card">
-            <h2>Welkom terug!</h2>
-            <p>Je hebt toegang tot het systeem als <strong><?php echo htmlspecialchars($user_role); ?></strong>.</p>
+        <div class="page-header">
+            <h1>Welkom terug!</h1>
+            <p>Hier is een overzicht van de prestaties en openstaande taken.</p>
         </div>
 
-        <div class="stats-grid">
-            <div class="stat-card">
-                <span class="stat-number"><?php echo $countDrivers; ?></span>
-                <span class="stat-label">Geregistreerde Chauffeurs</span>
+        <div class="action-bar">
+            <a href="#" class="btn-primary">
+                <span>+</span> Nieuwe Chauffeur
+            </a>
+            <a href="#" class="btn-primary" style="background-color: #0f172a;">
+                <span>📝</span> Feedback Starten
+            </a>
+        </div>
+
+        <div class="dashboard-grid">
+            <div class="card stat-card">
+                <div class="stat-info">
+                    <h3>Actieve Chauffeurs</h3>
+                    <span class="value"><?php echo $stats['drivers']; ?></span>
+                </div>
+                <div class="stat-icon">👥</div>
             </div>
-            <div class="stat-card">
-                <span class="stat-number"><?php echo $countOpenForms; ?></span>
-                <span class="stat-label">Openstaande Feedback Gesprekken</span>
+
+            <div class="card stat-card">
+                <div class="stat-info">
+                    <h3>Openstaande Dossiers</h3>
+                    <span class="value"><?php echo $stats['open_feedback']; ?></span>
+                </div>
+                <div class="stat-icon" style="background: #fffbeb; color: #f59e0b;">⚠️</div>
             </div>
-            <div class="stat-card">
-                <span class="stat-number">0</span> <span class="stat-label">Mijn Taken</span>
+
+            <div class="card stat-card">
+                <div class="stat-info">
+                    <h3>Mijn Team</h3>
+                    <span class="value">-</span>
+                </div>
+                <div class="stat-icon" style="background: #f0fdf4; color: #10b981;">🛡️</div>
             </div>
         </div>
 
-        <div class="actions">
-            <h3>Snelle Acties</h3>
-            <a href="#" class="btn">Nieuwe Chauffeur</a>
-            <a href="#" class="btn">Feedback Gesprek Starten</a>
+        <div class="card">
+            <h3 style="margin-top:0; margin-bottom: 1rem;">Recente Feedback Dossiers</h3>
             
-            <?php if($user_role === 'admin'): ?>
-                <a href="#" class="btn" style="background-color: #6c757d;">Beheer Gebruikers (Admin)</a>
+            <?php if (empty($recentActivities)): ?>
+                <p style="color: var(--secondary); font-style: italic;">Nog geen feedback formulieren gevonden.</p>
+            <?php else: ?>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Datum</th>
+                                <th>Chauffeur</th>
+                                <th>Gemaakt door</th>
+                                <th>Status</th>
+                                <th>Actie</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($recentActivities as $row): ?>
+                            <tr>
+                                <td><?php echo htmlspecialchars($row['form_date']); ?></td>
+                                <td><strong><?php echo htmlspecialchars($row['driver_name']); ?></strong></td>
+                                <td><?php echo htmlspecialchars($row['creator_email']); ?></td>
+                                <td>
+                                    <?php 
+                                        $statusClass = ($row['status'] === 'open') ? 'status-open' : 'status-completed';
+                                        // Vertaal status naar NL (hoewel database Engels is)
+                                        $displayStatus = ($row['status'] === 'open') ? 'Open' : 'Afgerond';
+                                    ?>
+                                    <span class="status-badge <?php echo $statusClass; ?>">
+                                        <?php echo $displayStatus; ?>
+                                    </span>
+                                </td>
+                                <td>
+                                    <a href="#" style="color: var(--primary); text-decoration: none; font-weight: 600;">Bekijk &rarr;</a>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
             <?php endif; ?>
         </div>
 
