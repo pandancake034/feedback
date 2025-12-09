@@ -1,7 +1,7 @@
 <?php
 /**
  * DASHBOARD.PHP
- * Inclusief: "Spotlight" search (Centraal, Blur, Auto-suggest)
+ * Inclusief: Spotlight Search & Custom Logo in Sidebar
  */
 
 require_once __DIR__ . '/config/config.php';
@@ -14,7 +14,6 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 // --- AJAX HANDLER VOOR LIVE SUGGESTIES ---
-// Dit blokje vangt de zoekopdracht af voordat de rest van de pagina laadt
 if (isset($_GET['ajax_search'])) {
     header('Content-Type: application/json');
     $term = trim($_GET['ajax_search']);
@@ -25,7 +24,6 @@ if (isset($_GET['ajax_search'])) {
     }
 
     try {
-        // Zoek op naam, ID of status
         $sql = "SELECT d.id as driver_id, d.name, d.employee_id, f.id as form_id, f.form_date, f.status 
                 FROM feedback_forms f
                 JOIN drivers d ON f.driver_id = d.id
@@ -41,11 +39,11 @@ if (isset($_GET['ajax_search'])) {
     } catch (PDOException $e) {
         echo json_encode(['error' => $e->getMessage()]);
     }
-    exit; // Stop hier, anders wordt de HTML van de pagina ook teruggestuurd
+    exit;
 }
 // ------------------------------------------
 
-// 2a. LOGICA: TOEWIJZING & STATUS (Bestaande code)
+// 2a. LOGICA: TOEWIJZING & STATUS
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['assign_user_id'], $_POST['form_id'])) {
         $stmt = $pdo->prepare("UPDATE feedback_forms SET assigned_to_user_id = ? WHERE id = ?");
@@ -59,7 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// 3. DATA OPHALEN (Standaard Dashboard Data)
+// 3. DATA OPHALEN
 $userEmail = $_SESSION['email'];
 $msg = $_GET['msg'] ?? '';
 
@@ -110,9 +108,26 @@ $recentActivities = $pdo->query("SELECT
         body { margin: 0; font-family: 'Segoe UI', system-ui, sans-serif; background-color: var(--bg-body); color: var(--text-main); display: flex; height: 100vh; overflow: hidden; }
         * { box-sizing: border-box; }
 
-        /* ... Bestaande Sidebar & Layout Styles ... */
+        /* SIDEBAR */
         .sidebar { width: 240px; background-color: var(--sidebar-bg); color: white; display: flex; flex-direction: column; flex-shrink: 0; }
-        .sidebar-header { height: 60px; display: flex; align-items: center; padding: 0 20px; font-size: 18px; font-weight: 700; border-bottom: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.2); }
+        
+        /* AANGEPAST: Sidebar Header voor Logo */
+        .sidebar-header { 
+            height: 60px; 
+            display: flex; 
+            align-items: center; 
+            padding: 0 20px; 
+            border-bottom: 1px solid rgba(255,255,255,0.1); 
+            background: rgba(0,0,0,0.2); 
+        }
+        
+        /* Zorgt dat het logo netjes past */
+        .sidebar-logo {
+            max-height: 40px; 
+            width: auto;
+            display: block;
+        }
+
         .nav-list { list-style: none; padding: 20px 0; margin: 0; flex-grow: 1; }
         .nav-item a { display: flex; align-items: center; padding: 12px 20px; color: #b0b6c3; text-decoration: none; transition: 0.2s; font-size: 14px; }
         .nav-item a:hover, .nav-item a.active { background-color: rgba(255,255,255,0.1); color: white; border-left: 4px solid var(--brand-color); }
@@ -146,112 +161,34 @@ $recentActivities = $pdo->query("SELECT
         .assign-select { padding: 5px; border: 1px solid #ccc; border-radius: 4px; font-size: 12px; max-width: 150px; }
         .btn-icon-save { background: none; border: none; cursor: pointer; color: var(--brand-color); margin-left: 5px; padding: 4px; }
 
-        /* --- NIEUW: SPOTLIGHT SEARCH OVERLAY STIJLEN --- */
+        /* SPOTLIGHT SEARCH STIJLEN */
         #search-overlay {
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background-color: rgba(255, 255, 255, 0.65); /* Semi-transparant wit */
-            backdrop-filter: blur(12px); /* DE BLUR */
-            -webkit-backdrop-filter: blur(12px);
-            z-index: 9999;
-            display: none; /* Standaard verborgen */
-            justify-content: center;
-            align-items: flex-start; /* Start iets van boven */
-            padding-top: 15vh;
-            transition: opacity 0.2s ease;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(255, 255, 255, 0.65);
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            z-index: 9999; display: none; justify-content: center; align-items: flex-start;
+            padding-top: 15vh; transition: opacity 0.2s ease;
         }
-
         .spotlight-container {
-            width: 100%;
-            max-width: 600px;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 20px 50px rgba(0,0,0,0.2);
-            overflow: hidden;
-            border: 1px solid rgba(0,0,0,0.05);
+            width: 100%; max-width: 600px; background: white; border-radius: 12px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.2); overflow: hidden; border: 1px solid rgba(0,0,0,0.05);
             animation: slideDown 0.2s ease-out;
         }
-
-        @keyframes slideDown {
-            from { transform: translateY(-20px); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
-        }
-
-        .spotlight-input-wrapper {
-            display: flex;
-            align-items: center;
-            padding: 16px 20px;
-            border-bottom: 1px solid #eee;
-        }
-
-        .spotlight-icon {
-            font-size: 24px;
-            color: #999;
-            margin-right: 15px;
-        }
-
-        #spotlight-input {
-            border: none;
-            font-size: 20px;
-            width: 100%;
-            outline: none;
-            color: var(--text-main);
-            font-family: inherit;
-            background: transparent;
-        }
-
-        #spotlight-results {
-            max-height: 400px;
-            overflow-y: auto;
-        }
-
-        .result-item {
-            padding: 12px 20px;
-            border-bottom: 1px solid #f7f7f7;
-            cursor: pointer;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            transition: background 0.1s;
-        }
-
-        .result-item:hover, .result-item.active {
-            background-color: #f0f4f8; /* Lichte brand color */
-        }
-
+        @keyframes slideDown { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .spotlight-input-wrapper { display: flex; align-items: center; padding: 16px 20px; border-bottom: 1px solid #eee; }
+        .spotlight-icon { font-size: 24px; color: #999; margin-right: 15px; }
+        #spotlight-input { border: none; font-size: 20px; width: 100%; outline: none; color: var(--text-main); font-family: inherit; background: transparent; }
+        #spotlight-results { max-height: 400px; overflow-y: auto; }
+        .result-item { padding: 12px 20px; border-bottom: 1px solid #f7f7f7; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: background 0.1s; }
+        .result-item:hover, .result-item.active { background-color: #f0f4f8; }
         .result-main { font-weight: 600; font-size: 15px; color: var(--text-main); }
         .result-sub { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
         .result-meta { font-size: 12px; padding: 3px 8px; border-radius: 4px; background: #eee; color: #555; }
         .no-results { padding: 20px; text-align: center; color: #999; font-size: 14px; }
-        
-        /* Hint text onderaan zoekbalk */
-        .spotlight-footer {
-            padding: 8px 20px;
-            background: #fafafa;
-            border-top: 1px solid #eee;
-            font-size: 11px;
-            color: #999;
-            display: flex;
-            justify-content: space-between;
-        }
-
-        /* Fake search bar in header (trigger) */
-        .header-search-trigger {
-            background: #f3f2f2;
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            padding: 8px 12px;
-            width: 250px;
-            color: var(--text-secondary);
-            font-size: 13px;
-            display: flex; align-items: center; gap: 8px;
-            cursor: text;
-        }
+        .spotlight-footer { padding: 8px 20px; background: #fafafa; border-top: 1px solid #eee; font-size: 11px; color: #999; display: flex; justify-content: space-between; }
+        .header-search-trigger { background: #f3f2f2; border: 1px solid var(--border-color); border-radius: 6px; padding: 8px 12px; width: 250px; color: var(--text-secondary); font-size: 13px; display: flex; align-items: center; gap: 8px; cursor: text; }
         .header-search-trigger:hover { background: #e9e9e9; }
-        .kbd-shortcut {
-            background: white; border: 1px solid #ccc; border-radius: 4px; padding: 0 5px; font-size: 10px; margin-left: auto;
-        }
-
+        .kbd-shortcut { background: white; border: 1px solid #ccc; border-radius: 4px; padding: 0 5px; font-size: 10px; margin-left: auto; }
     </style>
 </head>
 <body>
@@ -262,16 +199,18 @@ $recentActivities = $pdo->query("SELECT
                 <span class="material-icons-outlined spotlight-icon">search</span>
                 <input type="text" id="spotlight-input" placeholder="Zoek dossier, chauffeur of ID..." autocomplete="off">
             </div>
-            <div id="spotlight-results">
-                </div>
+            <div id="spotlight-results"></div>
             <div class="spotlight-footer">
                 <span>Gebruik ⬆⬇ om te navigeren, <strong>Enter</strong> om te openen.</span>
                 <span>ESC om te sluiten</span>
             </div>
         </div>
     </div>
+
     <aside class="sidebar">
-        <div class="sidebar-header">LogistiekApp</div>
+        <div class="sidebar-header">
+            <img src="https://i.imgur.com/qGySlgO.png" alt="LogistiekApp" class="sidebar-logo">
+        </div>
         <ul class="nav-list">
             <li class="nav-item"><a href="dashboard.php" class="active"><span class="material-icons-outlined">dashboard</span> Dashboard</a></li>
             <li class="nav-item"><a href="feedback_create.php"><span class="material-icons-outlined">add_circle</span> Nieuw Gesprek</a></li>
@@ -379,42 +318,26 @@ $recentActivities = $pdo->query("SELECT
         const resultsDiv = document.getElementById('spotlight-results');
         let selectedIndex = -1;
 
-        // 1. Openen / Sluiten Functies
         function openSearch() {
             overlay.style.display = 'flex';
-            input.focus();
-            input.value = ''; // Reset
+            input.focus(); input.value = '';
             resultsDiv.innerHTML = '<div class="no-results">Typ om te zoeken...</div>';
         }
+        function closeSearch() { overlay.style.display = 'none'; }
 
-        function closeSearch() {
-            overlay.style.display = 'none';
-        }
-
-        // 2. Global Key Listener (Om te openen als je typt)
         document.addEventListener('keydown', (e) => {
-            // Als overlay dicht is en we typen een letter of /
             if (overlay.style.display === 'none') {
                 if (e.key === '/' || (e.key.length === 1 && /[a-zA-Z0-9]/.test(e.key))) {
-                    e.preventDefault();
-                    openSearch();
-                    if(e.key !== '/') input.value = e.key; // Eerste letter invullen
+                    e.preventDefault(); openSearch();
+                    if(e.key !== '/') input.value = e.key;
                 }
             } else {
-                // Als overlay open is: Navigatie
                 if (e.key === 'Escape') closeSearch();
-                
                 const items = document.querySelectorAll('.result-item');
                 if (items.length > 0) {
-                    if (e.key === 'ArrowDown') {
-                        selectedIndex = (selectedIndex + 1) % items.length;
-                        updateSelection(items);
-                    } else if (e.key === 'ArrowUp') {
-                        selectedIndex = (selectedIndex - 1 + items.length) % items.length;
-                        updateSelection(items);
-                    } else if (e.key === 'Enter' && selectedIndex >= 0) {
-                        window.location.href = items[selectedIndex].dataset.url;
-                    }
+                    if (e.key === 'ArrowDown') { selectedIndex = (selectedIndex + 1) % items.length; updateSelection(items); } 
+                    else if (e.key === 'ArrowUp') { selectedIndex = (selectedIndex - 1 + items.length) % items.length; updateSelection(items); } 
+                    else if (e.key === 'Enter' && selectedIndex >= 0) { window.location.href = items[selectedIndex].dataset.url; }
                 }
             }
         });
@@ -426,61 +349,31 @@ $recentActivities = $pdo->query("SELECT
             });
         }
 
-        // 3. Sluiten als je buiten de box klikt
-        overlay.addEventListener('click', (e) => {
-            if (e.target === overlay) closeSearch();
-        });
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) closeSearch(); });
 
-        // 4. Live Zoeken (AJAX)
         let debounceTimer;
         input.addEventListener('input', () => {
             clearTimeout(debounceTimer);
             const term = input.value.trim();
-            
-            if (term.length < 1) {
-                resultsDiv.innerHTML = '<div class="no-results">Typ om te zoeken...</div>';
-                return;
-            }
+            if (term.length < 1) { resultsDiv.innerHTML = '<div class="no-results">Typ om te zoeken...</div>'; return; }
 
             debounceTimer = setTimeout(() => {
                 fetch(`dashboard.php?ajax_search=${encodeURIComponent(term)}`)
-                    .then(response => response.json())
+                    .then(r => r.json())
                     .then(data => {
-                        resultsDiv.innerHTML = '';
-                        selectedIndex = -1; // Reset selectie
-
-                        if (data.length === 0) {
-                            resultsDiv.innerHTML = '<div class="no-results">Geen resultaten gevonden.</div>';
-                            return;
-                        }
-
+                        resultsDiv.innerHTML = ''; selectedIndex = -1;
+                        if (data.length === 0) { resultsDiv.innerHTML = '<div class="no-results">Geen resultaten gevonden.</div>'; return; }
                         data.forEach((item, index) => {
                             const div = document.createElement('div');
-                            div.className = 'result-item';
-                            div.dataset.url = `feedback_view.php?id=${item.form_id}`;
-                            div.innerHTML = `
-                                <div>
-                                    <div class="result-main">${item.name}</div>
-                                    <div class="result-sub">ID: ${item.employee_id || '-'} • Datum: ${item.form_date}</div>
-                                </div>
-                                <div class="result-meta">${item.status}</div>
-                            `;
-                            // Klikken werkt ook
-                            div.addEventListener('click', () => {
-                                window.location.href = div.dataset.url;
-                            });
-                            // Mouseover selectie
-                            div.addEventListener('mouseenter', () => {
-                                selectedIndex = index;
-                                updateSelection(document.querySelectorAll('.result-item'));
-                            });
+                            div.className = 'result-item'; div.dataset.url = `feedback_view.php?id=${item.form_id}`;
+                            div.innerHTML = `<div><div class="result-main">${item.name}</div><div class="result-sub">ID: ${item.employee_id || '-'} • Datum: ${item.form_date}</div></div><div class="result-meta">${item.status}</div>`;
+                            div.addEventListener('click', () => { window.location.href = div.dataset.url; });
+                            div.addEventListener('mouseenter', () => { selectedIndex = index; updateSelection(document.querySelectorAll('.result-item')); });
                             resultsDiv.appendChild(div);
                         });
-                    })
-                    .catch(err => console.error(err));
-            }, 200); // Wacht 200ms na typen
+                    }).catch(err => console.error(err));
+            }, 200);
         });
     </script>
-
 </body>
 </html>
