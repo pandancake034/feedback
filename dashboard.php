@@ -244,7 +244,7 @@ $recentActivities = $pdo->query("SELECT
         </div>
         <ul class="nav-list">
             <li class="nav-item"><a href="dashboard.php" class="active"><span class="material-icons-outlined">dashboard</span> Dashboard</a></li>
-            <li class="nav-item"><a href="feedback_create.php"><span class="material-icons-outlined">add_circle</span> Nieuw Gesprek</a></li>
+            <li class="nav-item"><a href="feedback_create.php"><span class="material-icons-outlined">add_circle</span> Feedback gesprek</a></li>
             <li class="nav-item"><a href="#"><span class="material-icons-outlined">people</span> Chauffeurs</a></li>
         </ul>
     </aside>
