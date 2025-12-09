@@ -162,7 +162,7 @@ try {
         }
         .status-select:focus { outline: none; box-shadow: 0 0 0 2px rgba(1, 118, 211, 0.2); }
         
-        .status-open-bg { background: #fff0b5; color: #744f05; }
+        .status-open-bg { background: #c74242ff; color: #744f05; }
         .status-completed-bg { background: #c1f0d3; color: #0c4d26; }
 
         .status-badge { padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
