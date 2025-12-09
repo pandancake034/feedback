@@ -59,7 +59,7 @@ $page_title = "Dossier Inzien";
 <html lang="nl">
 <head>
     <meta charset="UTF-8">
-    <title>Dossier Inzien | <?php echo htmlspecialchars($form['driver_name']); ?></title>
+<title><?php echo APP_TITLE; ?></title>
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
