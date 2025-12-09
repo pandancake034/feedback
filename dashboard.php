@@ -280,7 +280,7 @@ $recentActivities = $pdo->query("SELECT
                 </div>
                 <div>
                     <a href="feedback_create.php" class="btn btn-brand">
-                        <span class="material-icons-outlined" style="font-size: 18px;">add</span> Nieuw Gesprek
+                        <span class="material-icons-outlined" style="font-size: 18px;">add</span> Feedback gesprek
                     </a>
                 </div>
             </div>
