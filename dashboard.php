@@ -1,7 +1,7 @@
 <?php
 /**
  * DASHBOARD.PHP
- * Inclusief: Direct toewijzen van teamleiders aan openstaande gesprekken.
+ * Inclusief: Direct toewijzen van teamleiders & Status wijzigen.
  */
 
 require_once __DIR__ . '/config/config.php';
@@ -18,18 +18,27 @@ if (!isset($_SESSION['role']) || !isset($_SESSION['email'])) {
     exit;
 }
 
-// 2. LOGICA: TOEWIJZING VERWERKEN (POST)
-// Dit stukje code luistert of er op het 'opslaan' icoontje is geklikt
+// 2a. LOGICA: TOEWIJZING VERWERKEN (POST)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['assign_user_id']) && isset($_POST['form_id'])) {
     try {
         $stmt = $pdo->prepare("UPDATE feedback_forms SET assigned_to_user_id = ? WHERE id = ?");
         $stmt->execute([$_POST['assign_user_id'], $_POST['form_id']]);
-        
-        // Pagina verversen om de wijziging te tonen
         header("Location: dashboard.php?msg=assigned");
         exit;
     } catch (PDOException $e) {
-        // Foutafhandeling (in productie loggen)
+        // Foutafhandeling
+    }
+}
+
+// 2b. LOGICA: STATUS AANPASSEN (POST) - NIEUW
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status']) && isset($_POST['form_id']) && isset($_POST['new_status'])) {
+    try {
+        $stmt = $pdo->prepare("UPDATE feedback_forms SET status = ? WHERE id = ?");
+        $stmt->execute([$_POST['new_status'], $_POST['form_id']]);
+        header("Location: dashboard.php?msg=status_updated");
+        exit;
+    } catch (PDOException $e) {
+        // Foutafhandeling
     }
 }
 
@@ -50,7 +59,7 @@ try {
     $teamleads = $pdo->query("SELECT id, email FROM users ORDER BY email ASC")->fetchAll();
 } catch (PDOException $e) {}
 
-// Recente Activiteiten (Met JOIN om te zien aan wie het is toegewezen)
+// Recente Activiteiten
 $recentActivities = [];
 try {
     $sql = "SELECT 
@@ -112,7 +121,7 @@ try {
         .search-bar input { padding: 8px 12px 8px 35px; border: 1px solid var(--border-color); border-radius: 4px; width: 300px; }
         .user-profile { display: flex; align-items: center; gap: 12px; font-size: 13px; font-weight: 600; }
 
-        .page-body { padding: 24px; max-width: 1400px; margin: 0 auto; width: 100%; flex-grow: 1; } /* flex-grow toegevoegd voor footer alignment */
+        .page-body { padding: 24px; max-width: 1400px; margin: 0 auto; width: 100%; flex-grow: 1; }
         
         /* ALERTS */
         .alert-toast { background: var(--success-bg); color: var(--success-text); padding: 10px 15px; border-radius: 4px; margin-bottom: 20px; font-size: 14px; border: 1px solid #a7f3d0; display: flex; align-items: center; gap: 10px; }
@@ -139,13 +148,30 @@ try {
         th { text-align: left; padding: 10px; border-bottom: 1px solid var(--border-color); color: var(--text-secondary); font-weight: 600; text-transform: uppercase; font-size: 11px; }
         td { padding: 10px; border-bottom: 1px solid #eee; color: var(--text-main); vertical-align: middle; }
         
+        /* STATUS SELECT STIJLEN */
+        .status-select {
+            appearance: none; /* Verwijder standaard pijl in sommige browsers voor strakkere look */
+            -webkit-appearance: none;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            border: 1px solid transparent;
+            cursor: pointer;
+            text-align: center;
+        }
+        .status-select:focus { outline: none; box-shadow: 0 0 0 2px rgba(1, 118, 211, 0.2); }
+        
+        .status-open-bg { background: #fff0b5; color: #744f05; }
+        .status-completed-bg { background: #c1f0d3; color: #0c4d26; }
+
         .status-badge { padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
         .status-open { background: #fff0b5; color: #744f05; }
         .status-completed { background: #c1f0d3; color: #0c4d26; }
 
         /* ASSIGN FORM STYLES */
         .assign-select { padding: 5px; border: 1px solid #ccc; border-radius: 4px; font-size: 12px; max-width: 150px; }
-        .btn-icon-save { background: none; border: none; cursor: pointer; color: var(--brand-color); margin-left: 5px; padding: 4px; border-radius: 4px; }
+        .btn-icon-save { background: none; border: none; cursor: pointer; color: var(--brand-color); margin-left: 5px; padding: 4px; border-radius: 4px; display: inline-flex; align-items: center; }
         .btn-icon-save:hover { background-color: #e0e7ff; }
 
     </style>
@@ -194,6 +220,8 @@ try {
                 <div class="alert-toast"><span class="material-icons-outlined">save</span> Wijzigingen opgeslagen.</div>
             <?php elseif ($msg === 'assigned'): ?>
                 <div class="alert-toast"><span class="material-icons-outlined">person_add</span> Teamleider toegewezen.</div>
+            <?php elseif ($msg === 'status_updated'): ?>
+                <div class="alert-toast"><span class="material-icons-outlined">done</span> Status gewijzigd.</div>
             <?php elseif ($msg === 'completed'): ?>
                 <div class="alert-toast"><span class="material-icons-outlined">done_all</span> Dossier afgerond!</div>
             <?php endif; ?>
@@ -262,10 +290,21 @@ try {
                                     </td>
 
                                     <td><?php echo htmlspecialchars($row['creator_email']); ?></td>
+                                    
                                     <td>
-                                        <span class="status-badge <?php echo ($row['status'] === 'open') ? 'status-open' : 'status-completed'; ?>">
-                                            <?php echo ucfirst($row['status']); ?>
-                                        </span>
+                                        <form method="POST" style="display: flex; align-items: center; gap: 5px;">
+                                            <input type="hidden" name="form_id" value="<?php echo $row['id']; ?>">
+                                            <input type="hidden" name="update_status" value="1">
+                                            
+                                            <select name="new_status" class="status-select <?php echo ($row['status'] === 'open') ? 'status-open-bg' : 'status-completed-bg'; ?>">
+                                                <option value="open" <?php if($row['status'] === 'open') echo 'selected'; ?>>Open</option>
+                                                <option value="completed" <?php if($row['status'] === 'completed') echo 'selected'; ?>>Gesloten</option>
+                                            </select>
+                                            
+                                            <button type="submit" class="btn-icon-save" title="Status Opslaan">
+                                                <span class="material-icons-outlined" style="font-size: 16px;">save</span>
+                                            </button>
+                                        </form>
                                     </td>
                                     
                                     <td>
@@ -283,7 +322,7 @@ try {
                                                         <option value="<?php echo $lead['id']; ?>"><?php echo htmlspecialchars($lead['email']); ?></option>
                                                     <?php endforeach; ?>
                                                 </select>
-                                                <button type="submit" class="btn-icon-save" title="Opslaan">
+                                                <button type="submit" class="btn-icon-save" title="Toewijzen Opslaan">
                                                     <span class="material-icons-outlined" style="font-size: 18px;">save</span>
                                                 </button>
                                             </form>
