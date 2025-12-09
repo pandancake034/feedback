@@ -302,8 +302,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                 <label>Proficiency Level:(1-14)</label>
                                 <select name="proficiency_rating">
                                     <option value="0">-- Kies --</option>
-                                    <?php for($i=1;$i<=5;$i++): ?>
-                                        <option value="<?php echo $i; ?>" <?php if($data['proficiency_rating']==$i) echo 'selected'; ?>><?php echo $i; ?> Sterren</option>
+                                    <?php for($i=1;$i<=14;$i++): ?>
+                                        <option value="<?php echo $i; ?>" <?php if($data['proficiency_rating']==$i) echo 'selected'; ?>><?php echo $i; ?> niveau</option>
                                     <?php endfor; ?>
                                 </select>
                             </div>
