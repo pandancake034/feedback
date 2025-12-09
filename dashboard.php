@@ -112,7 +112,7 @@ try {
         .search-bar input { padding: 8px 12px 8px 35px; border: 1px solid var(--border-color); border-radius: 4px; width: 300px; }
         .user-profile { display: flex; align-items: center; gap: 12px; font-size: 13px; font-weight: 600; }
 
-        .page-body { padding: 24px; max-width: 1400px; margin: 0 auto; width: 100%; }
+        .page-body { padding: 24px; max-width: 1400px; margin: 0 auto; width: 100%; flex-grow: 1; } /* flex-grow toegevoegd voor footer alignment */
         
         /* ALERTS */
         .alert-toast { background: var(--success-bg); color: var(--success-text); padding: 10px 15px; border-radius: 4px; margin-bottom: 20px; font-size: 14px; border: 1px solid #a7f3d0; display: flex; align-items: center; gap: 10px; }
@@ -243,7 +243,8 @@ try {
                                 <th>Chauffeur</th>
                                 <th>Gemaakt Door</th>
                                 <th>Status</th>
-                                <th style="min-width: 200px;">Toegewezen Aan</th> <th style="text-align: right;">Actie</th>
+                                <th style="min-width: 200px;">Toegewezen Aan</th> 
+                                <th style="text-align: right;">Actie</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -253,7 +254,13 @@ try {
                                 <?php foreach ($recentActivities as $row): ?>
                                 <tr>
                                     <td><?php echo htmlspecialchars($row['form_date']); ?></td>
-                                    <td><strong><?php echo htmlspecialchars($row['driver_name']); ?></strong></td>
+                                    
+                                    <td>
+                                        <a href="feedback_view.php?id=<?php echo $row['id']; ?>" style="color: var(--brand-color); text-decoration: none; font-weight: 700;">
+                                            <?php echo htmlspecialchars($row['driver_name']); ?>
+                                        </a>
+                                    </td>
+
                                     <td><?php echo htmlspecialchars($row['creator_email']); ?></td>
                                     <td>
                                         <span class="status-badge <?php echo ($row['status'] === 'open') ? 'status-open' : 'status-completed'; ?>">
@@ -284,7 +291,8 @@ try {
                                     </td>
 
                                     <td style="text-align: right;">
-<a href="feedback_view.php?id=<?php echo $row['id']; ?>" style="color: var(--brand-color); text-decoration: none; font-weight: 600;">                                            Bewerken &rarr;
+                                        <a href="feedback_form.php?id=<?php echo $row['id']; ?>" title="Bewerken" style="color: var(--text-secondary); text-decoration: none; display: inline-flex; align-items: center;">
+                                            <span class="material-icons-outlined" style="font-size: 20px;">edit</span>
                                         </a>
                                     </td>
                                 </tr>
@@ -296,6 +304,9 @@ try {
             </div>
 
         </div>
+
+        <?php include __DIR__ . '/includes/footer.php'; ?>
+
     </main>
 </body>
 </html>
