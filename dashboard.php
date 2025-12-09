@@ -1,7 +1,7 @@
 <?php
 /**
  * DASHBOARD.PHP
- * Inclusief: Spotlight Search, Logo, Status Wijzigen & Direct Toewijzen
+ * Inclusief: Spotlight Search, Logo, Status/Toewijzing & KPI Gesloten Dossiers
  */
 
 require_once __DIR__ . '/config/config.php';
@@ -49,7 +49,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['assign_user_id'], $_POST['form_id'])) {
         try {
             $stmt = $pdo->prepare("UPDATE feedback_forms SET assigned_to_user_id = ? WHERE id = ?");
-            // Als waarde leeg is, maak het NULL in database
             $val = !empty($_POST['assign_user_id']) ? $_POST['assign_user_id'] : null;
             $stmt->execute([$val, $_POST['form_id']]);
             header("Location: dashboard.php?msg=assigned"); 
@@ -72,11 +71,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $userEmail = $_SESSION['email'];
 $msg = $_GET['msg'] ?? '';
 
-// Statistieken
-$stats = ['drivers' => 0, 'open_feedback' => 0];
+// Statistieken (AANGEPAST: Nu met 'closed_feedback')
+$stats = ['drivers' => 0, 'open_feedback' => 0, 'closed_feedback' => 0];
 try {
     $stats['drivers'] = $pdo->query("SELECT COUNT(*) FROM drivers")->fetchColumn();
     $stats['open_feedback'] = $pdo->query("SELECT COUNT(*) FROM feedback_forms WHERE status = 'open'")->fetchColumn();
+    // NIEUW: Tel gesloten dossiers
+    $stats['closed_feedback'] = $pdo->query("SELECT COUNT(*) FROM feedback_forms WHERE status = 'completed'")->fetchColumn();
 } catch (PDOException $e) {}
 
 // Haal teamleiders op voor de dropdown
@@ -151,46 +152,19 @@ $recentActivities = $pdo->query("SELECT
         td { padding: 10px; border-bottom: 1px solid #eee; color: var(--text-main); vertical-align: middle; }
         
         /* --- INTERACTIEVE DROPDOWNS --- */
-        
-        /* Algemene select reset */
         .live-select {
             appearance: none; -webkit-appearance: none;
-            padding: 4px 24px 4px 8px; /* Ruimte rechts voor pijltje */
-            border-radius: 4px;
-            font-size: 12px;
-            font-family: inherit;
-            border: 1px solid transparent;
-            cursor: pointer;
-            background-color: transparent;
-            font-weight: 500;
-            transition: all 0.2s;
-            /* Aangepast pijltje */
+            padding: 4px 24px 4px 8px;
+            border-radius: 4px; font-size: 12px; font-family: inherit;
+            border: 1px solid transparent; cursor: pointer; background-color: transparent; font-weight: 500; transition: all 0.2s;
             background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23333%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
-            background-repeat: no-repeat;
-            background-position: right 6px center;
-            background-size: 8px;
+            background-repeat: no-repeat; background-position: right 6px center; background-size: 8px;
         }
-        .live-select:hover {
-            border-color: #bbb;
-            background-color: #f9f9f9;
-        }
-        .live-select:focus {
-            outline: none;
-            border-color: var(--brand-color);
-            background-color: white;
-            box-shadow: 0 0 0 1px var(--brand-color);
-        }
-
-        /* Status specifieke kleuren */
+        .live-select:hover { border-color: #bbb; background-color: #f9f9f9; }
+        .live-select:focus { outline: none; border-color: var(--brand-color); background-color: white; box-shadow: 0 0 0 1px var(--brand-color); }
         .status-open { color: #b45309; background-color: #fffbeb; border: 1px solid #fcd34d; }
         .status-completed { color: #065f46; background-color: #d1fae5; border: 1px solid #6ee7b7; }
-        
-        /* Toewijzing specifieke stijl */
-        .assign-select {
-            color: var(--text-main);
-            border: 1px solid #e5e7eb;
-            max-width: 160px;
-        }
+        .assign-select { color: var(--text-main); border: 1px solid #e5e7eb; max-width: 160px; }
 
         /* --- SPOTLIGHT SEARCH --- */
         #search-overlay {
@@ -244,7 +218,7 @@ $recentActivities = $pdo->query("SELECT
         </div>
         <ul class="nav-list">
             <li class="nav-item"><a href="dashboard.php" class="active"><span class="material-icons-outlined">dashboard</span> Dashboard</a></li>
-            <li class="nav-item"><a href="feedback_create.php"><span class="material-icons-outlined">add_circle</span> Feedback gesprek</a></li>
+            <li class="nav-item"><a href="feedback_create.php"><span class="material-icons-outlined">add_circle</span> Nieuw Gesprek</a></li>
             <li class="nav-item"><a href="#"><span class="material-icons-outlined">people</span> Chauffeurs</a></li>
         </ul>
     </aside>
@@ -280,7 +254,7 @@ $recentActivities = $pdo->query("SELECT
                 </div>
                 <div>
                     <a href="feedback_create.php" class="btn btn-brand">
-                        <span class="material-icons-outlined" style="font-size: 18px;">add</span> Feedback gesprek
+                        <span class="material-icons-outlined" style="font-size: 18px;">add</span> Nieuw Gesprek
                     </a>
                 </div>
             </div>
@@ -288,7 +262,7 @@ $recentActivities = $pdo->query("SELECT
             <div class="grid-row">
                 <div class="card"><div class="card-body"><div class="kpi-value"><?php echo $stats['drivers']; ?></div><div class="kpi-label">Actieve Chauffeurs</div></div></div>
                 <div class="card"><div class="card-body"><div class="kpi-value"><?php echo $stats['open_feedback']; ?></div><div class="kpi-label">Openstaande Dossiers</div></div></div>
-                <div class="card"><div class="card-body"><div class="kpi-value">98%</div><div class="kpi-label">Team OTD Score</div></div></div>
+                <div class="card"><div class="card-body"><div class="kpi-value"><?php echo $stats['closed_feedback']; ?></div><div class="kpi-label">Gesloten Dossiers</div></div></div>
             </div>
 
             <div class="card">
