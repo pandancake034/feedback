@@ -1,7 +1,7 @@
 <?php
 /**
  * DASHBOARD.PHP
- * Inclusief: Direct toewijzen van teamleiders & Status wijzigen.
+ * Inclusief: Werkende zoekfunctie & Directe redirect.
  */
 
 require_once __DIR__ . '/config/config.php';
@@ -30,7 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['assign_user_id']) && 
     }
 }
 
-// 2b. LOGICA: STATUS AANPASSEN (POST) - NIEUW
+// 2b. LOGICA: STATUS AANPASSEN (POST)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status']) && isset($_POST['form_id']) && isset($_POST['new_status'])) {
     try {
         $stmt = $pdo->prepare("UPDATE feedback_forms SET status = ? WHERE id = ?");
@@ -45,6 +45,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status']) && i
 // 3. DATA OPHALEN
 $userEmail = $_SESSION['email'];
 $msg = $_GET['msg'] ?? '';
+$search = trim($_GET['search'] ?? ''); // <--- NIEUW: Zoekterm ophalen
 
 // Statistieken
 $stats = ['drivers' => 0, 'open_feedback' => 0];
@@ -53,13 +54,13 @@ try {
     $stats['open_feedback'] = $pdo->query("SELECT COUNT(*) FROM feedback_forms WHERE status = 'open'")->fetchColumn();
 } catch (PDOException $e) {}
 
-// Lijst met Teamleiders (voor de dropdown)
+// Lijst met Teamleiders
 $teamleads = [];
 try {
     $teamleads = $pdo->query("SELECT id, email FROM users ORDER BY email ASC")->fetchAll();
 } catch (PDOException $e) {}
 
-// Recente Activiteiten
+// Recente Activiteiten & Zoekresultaten
 $recentActivities = [];
 try {
     $sql = "SELECT 
@@ -68,23 +69,55 @@ try {
                 f.status, 
                 f.assigned_to_user_id,
                 d.name as driver_name, 
+                d.employee_id,
                 u_creator.email as creator_email,
                 u_assigned.email as assigned_email
             FROM feedback_forms f
             JOIN drivers d ON f.driver_id = d.id
             JOIN users u_creator ON f.created_by_user_id = u_creator.id
-            LEFT JOIN users u_assigned ON f.assigned_to_user_id = u_assigned.id
-            ORDER BY f.created_at DESC 
-            LIMIT 10";
-    $recentActivities = $pdo->query($sql)->fetchAll();
-} catch (PDOException $e) {}
+            LEFT JOIN users u_assigned ON f.assigned_to_user_id = u_assigned.id";
+    
+    $params = [];
+
+    // --- ZOEK LOGICA ---
+    if (!empty($search)) {
+        // Als zoekterm een getal is, zoek dan ook op ID's
+        if (is_numeric($search)) {
+            $sql .= " WHERE (d.name LIKE ? OR d.employee_id LIKE ? OR f.status LIKE ? OR f.id = ?)";
+            $term = "%$search%";
+            $params = [$term, $term, $term, $search];
+        } else {
+            // Anders alleen tekstvelden
+            $sql .= " WHERE (d.name LIKE ? OR d.employee_id LIKE ? OR f.status LIKE ?)";
+            $term = "%$search%";
+            $params = [$term, $term, $term];
+        }
+    }
+
+    $sql .= " ORDER BY f.created_at DESC LIMIT 20"; // Iets ruimer limit voor zoeken
+
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $recentActivities = $stmt->fetchAll();
+
+    // --- DIRECT DOORSTUREN (REDIRECT) ---
+    // Als er precies 1 resultaat is én er is gezocht -> Ga direct naar dossier
+    if (!empty($search) && count($recentActivities) === 1) {
+        $foundId = $recentActivities[0]['id'];
+        header("Location: feedback_view.php?id=" . $foundId);
+        exit;
+    }
+
+} catch (PDOException $e) {
+    // Optioneel: $error = $e->getMessage();
+}
 
 ?>
 <!DOCTYPE html>
 <html lang="nl">
 <head>
     <meta charset="UTF-8">
-<title><?php echo APP_TITLE; ?></title>
+    <title><?php echo defined('APP_TITLE') ? APP_TITLE : 'Dashboard'; ?></title>
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;600;700&display=swap" rel="stylesheet">
 
@@ -118,7 +151,15 @@ try {
         .main-content { flex-grow: 1; display: flex; flex-direction: column; overflow-y: auto; }
         
         .top-header { height: 60px; background: white; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; padding: 0 24px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); position: sticky; top: 0; z-index: 10; }
-        .search-bar input { padding: 8px 12px 8px 35px; border: 1px solid var(--border-color); border-radius: 4px; width: 300px; }
+        
+        /* AANGEPAST: Search bar is nu een Form */
+        .search-bar { display: block; }
+        .search-bar input { padding: 8px 12px 8px 35px; border: 1px solid var(--border-color); border-radius: 4px; width: 300px; font-family: inherit; }
+        /* Icoontje trick voor search input */
+        .search-wrapper { position: relative; }
+        .search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 18px; color: var(--text-secondary); pointer-events: none; }
+        .search-bar input { padding-left: 35px; } 
+
         .user-profile { display: flex; align-items: center; gap: 12px; font-size: 13px; font-weight: 600; }
 
         .page-body { padding: 24px; max-width: 1400px; margin: 0 auto; width: 100%; flex-grow: 1; }
@@ -150,7 +191,7 @@ try {
         
         /* STATUS SELECT STIJLEN */
         .status-select {
-            appearance: none; /* Verwijder standaard pijl in sommige browsers voor strakkere look */
+            appearance: none;
             -webkit-appearance: none;
             padding: 4px 10px;
             border-radius: 12px;
@@ -164,10 +205,6 @@ try {
         
         .status-open-bg { background: #d07676ff; color: #744f05; }
         .status-completed-bg { background: #c1f0d3; color: #0c4d26; }
-
-        .status-badge { padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
-        .status-open { background: #fff0b5; color: #744f05; }
-        .status-completed { background: #c1f0d3; color: #0c4d26; }
 
         /* ASSIGN FORM STYLES */
         .assign-select { padding: 5px; border: 1px solid #ccc; border-radius: 4px; font-size: 12px; max-width: 150px; }
@@ -187,7 +224,7 @@ try {
                 </a>
             </li>
             <li class="nav-item">
-                <a href="feedback_form.php">
+                <a href="feedback_create.php">
                     <span class="material-icons-outlined">add_circle</span> Nieuw Gesprek
                 </a>
             </li>
@@ -200,9 +237,13 @@ try {
     <main class="main-content">
         
         <header class="top-header">
-            <div class="search-bar">
-                <input type="text" placeholder="Zoek op naam, ID of status...">
-            </div>
+            <form action="dashboard.php" method="GET" class="search-bar">
+                <div class="search-wrapper">
+                    <span class="material-icons-outlined search-icon">search</span>
+                    <input type="text" name="search" placeholder="Zoek op naam, ID of status..." value="<?php echo htmlspecialchars($search); ?>">
+                </div>
+            </form>
+
             <div class="user-profile">
                 <span class="material-icons-outlined" style="margin-right: 8px;">account_circle</span>
                 <?php echo htmlspecialchars($userEmail); ?>
@@ -232,7 +273,7 @@ try {
                     <div style="color: var(--text-secondary); font-size: 13px; margin-top: 4px;">Overzicht van prestaties en taken</div>
                 </div>
                 <div>
-                    <a href="feedback_form.php" class="btn btn-brand">
+                    <a href="feedback_create.php" class="btn btn-brand">
                         <span class="material-icons-outlined" style="font-size: 18px;">add</span> Nieuw Gesprek
                     </a>
                 </div>
@@ -261,7 +302,10 @@ try {
 
             <div class="card">
                 <div class="card-header">
-                    <h2>Recente Dossiers & Planning</h2>
+                    <h2><?php echo empty($search) ? 'Recente Dossiers & Planning' : 'Zoekresultaten voor: "' . htmlspecialchars($search) . '"'; ?></h2>
+                    <?php if(!empty($search)): ?>
+                        <a href="dashboard.php" style="font-size: 12px; color: var(--brand-color); text-decoration: none;">Wis zoeken</a>
+                    <?php endif; ?>
                 </div>
                 <div style="overflow-x: auto;">
                     <table style="width: 100%;">
@@ -284,9 +328,12 @@ try {
                                     <td><?php echo htmlspecialchars($row['form_date']); ?></td>
                                     
                                     <td>
-                                        <a href="feedback_view.php?id=<?php echo $row['id']; ?>" style="color: var(--brand-color); text-decoration: none; font-weight: 700;">
-                                            <?php echo htmlspecialchars($row['driver_name']); ?>
-                                        </a>
+                                        <div style="display: flex; flex-direction: column;">
+                                            <a href="feedback_view.php?id=<?php echo $row['id']; ?>" style="color: var(--brand-color); text-decoration: none; font-weight: 700;">
+                                                <?php echo htmlspecialchars($row['driver_name']); ?>
+                                            </a>
+                                            <span style="font-size: 11px; color: #999;"><?php echo htmlspecialchars($row['employee_id'] ?? ''); ?></span>
+                                        </div>
                                     </td>
 
                                     <td><?php echo htmlspecialchars($row['creator_email']); ?></td>
