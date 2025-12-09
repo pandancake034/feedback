@@ -281,16 +281,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                             <textarea name="driving_behavior"><?php echo htmlspecialchars($data['driving_behavior']); ?></textarea>
                         </div>
                         <div class="form-group">
-                            <label>Waarschuwingen (OW)</label>
+                            <label>Waarschuwingen</label>
                             <textarea name="warnings" style="border-color: #fca5a5;"><?php echo htmlspecialchars($data['warnings']); ?></textarea>
                         </div>
                         <div class="form-group">
-                            <label>Compliment van Klant</label>
+                            <label>Complimenten</label>
                             <textarea name="client_compliment" style="border-color: #86efac;"><?php echo htmlspecialchars($data['client_compliment']); ?></textarea>
                         </div>
                         <div class="form-grid">
                             <div class="form-group">
-                                <label>Vaardigheden (1-5)</label>
+                                <label> Skills (1-5)</label>
                                 <select name="skills_rating">
                                     <option value="0">-- Kies --</option>
                                     <?php for($i=1;$i<=5;$i++): ?>
@@ -299,7 +299,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                 </select>
                             </div>
                             <div class="form-group">
-                                <label>Vakbekwaamheid (1-5)</label>
+                                <label>Proficiency Level:(1-14)</label>
                                 <select name="proficiency_rating">
                                     <option value="0">-- Kies --</option>
                                     <?php for($i=1;$i<=5;$i++): ?>
@@ -314,7 +314,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 <div class="action-bar">
                     <a href="dashboard.php" class="btn btn-cancel">Annuleren</a>
                     <button type="submit" name="action" value="save" class="btn btn-save" style="background-color: white; color: var(--brand-color); border: 1px solid var(--brand-color);">Concept Opslaan</button>
-                    <button type="submit" name="action" value="complete" class="btn btn-save">Afronden & Opslaan</button>
+                    <button type="submit" name="action" value="complete" class="btn btn-save">Opslaan</button>
                 </div>
 
             </form>
