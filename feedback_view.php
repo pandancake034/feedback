@@ -39,8 +39,8 @@ try {
 
     if (!$form) die("Dossier niet gevonden.");
 
-    // B. Notities / Afspraken
-    $stmtNotes = $pdo->prepare("SELECT n.*, u.email as author 
+    // B. Notities / Afspraken (QUERY AANGEPAST: voornaam en achternaam ophalen)
+    $stmtNotes = $pdo->prepare("SELECT n.*, u.email, u.first_name, u.last_name 
                                 FROM notes n 
                                 JOIN users u ON n.user_id = u.id 
                                 WHERE n.driver_id = ? 
@@ -144,7 +144,7 @@ $page_title = "Dossier Inzien";
             /* LOGO ZICHTBAAR MAKEN BIJ PRINTEN */
             .print-only-logo {
                 display: block !important;
-                max-width: 180px; /* Pas formaat hier aan indien nodig */
+                max-width: 180px; 
                 margin-bottom: 20px;
             }
 
@@ -321,7 +321,15 @@ $page_title = "Dossier Inzien";
                                 <?php foreach($notes as $note): ?>
                                 <div class="timeline-item">
                                     <div class="note-meta">
-                                        <strong><?php echo htmlspecialchars($note['author']); ?></strong> • 
+                                        <strong>
+                                            <?php 
+                                                // Als voornaam en achternaam bestaan, gebruik die. Anders fallback naar email.
+                                                $authorName = (!empty($note['first_name']) || !empty($note['last_name'])) 
+                                                    ? trim($note['first_name'] . ' ' . $note['last_name']) 
+                                                    : $note['email'];
+                                                echo htmlspecialchars($authorName); 
+                                            ?>
+                                        </strong> • 
                                         <?php echo date('d-m-Y H:i', strtotime($note['note_date'])); ?>
                                     </div>
                                     <div class="note-content">
