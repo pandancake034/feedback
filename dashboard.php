@@ -67,7 +67,7 @@ $teamleads = $pdo->query("SELECT id, email, first_name, last_name FROM users ORD
 
 // Recente Activiteiten (QUERY AANGEPAST: f.start_date toegevoegd)
 $recentActivities = $pdo->query("SELECT 
-            f.id, f.form_date, f.start_date, f.status, f.assigned_to_user_id,
+            f.id, f.form_date, f.review_moment, f.status, f.assigned_to_user_id,
             d.name as driver_name, d.employee_id,
             u_creator.email as creator_email, 
             u_assigned.email as assigned_email,
