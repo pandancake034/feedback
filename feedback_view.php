@@ -72,7 +72,7 @@ $page_title = "Dossier Inzien";
         .sidebar { width: 240px; background: #1a2233; color: white; flex-shrink: 0; display: flex; flex-direction: column; }
         .main-content { flex-grow: 1; display: flex; flex-direction: column; overflow-y: auto; }
         
-        /* HEADER CSS (DIE MISTE) */
+        /* Header CSS */
         .top-header { 
             height: 60px; 
             background: white; 
@@ -82,7 +82,7 @@ $page_title = "Dossier Inzien";
             justify-content: space-between; 
             padding: 0 24px; 
             box-shadow: 0 2px 4px rgba(0,0,0,0.02); 
-            flex-shrink: 0; /* Belangrijk: zorgt dat header niet verdwijnt */
+            flex-shrink: 0;
         }
 
         /* Content Wrapper voor de 2 kolommen */
@@ -103,9 +103,9 @@ $page_title = "Dossier Inzien";
         .label { width: 140px; color: var(--text-light); font-size: 13px; font-weight: 600; flex-shrink: 0; }
         .value { font-size: 14px; color: var(--text-main); line-height: 1.4; }
         
-        /* Scores Visuals - UPDATE: Success variant toegevoegd */
+        /* Scores Visuals */
         .score-badge { display: inline-block; padding: 4px 8px; border-radius: 4px; background: #e0e7ff; color: #3730a3; font-weight: 700; font-size: 13px; }
-        .score-badge.success { background: #d1fae5; color: #065f46; } /* Groen bij > 96 */
+        .score-badge.success { background: #d1fae5; color: #065f46; } 
         
         /* Timeline / Notes */
         .timeline { margin-top: 15px; }
@@ -118,14 +118,67 @@ $page_title = "Dossier Inzien";
         .note-input { width: 100%; border: 1px solid var(--border-color); border-radius: 4px; padding: 10px; font-family: inherit; font-size: 13px; resize: vertical; min-height: 80px; }
         .btn-add { background: var(--brand-color); color: white; border: none; padding: 8px 16px; border-radius: 4px; font-size: 13px; font-weight: 600; cursor: pointer; margin-top: 8px; float: right; }
 
-        /* Header Actions */
+        /* Header Actions & Buttons */
         .page-header-actions { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
-        .btn-edit { text-decoration: none; border: 1px solid var(--border-color); background: white; color: var(--brand-color); padding: 8px 16px; border-radius: 4px; font-weight: 600; font-size: 13px; display: inline-flex; align-items: center; gap: 5px; transition: 0.2s; }
-        .btn-edit:hover { background-color: #f3f2f2; }
+        
+        /* Button Styles */
+        .btn-action { text-decoration: none; border: 1px solid var(--border-color); background: white; color: var(--text-main); padding: 8px 16px; border-radius: 4px; font-weight: 600; font-size: 13px; display: inline-flex; align-items: center; gap: 5px; transition: 0.2s; cursor: pointer; }
+        .btn-action:hover { background-color: #f3f2f2; }
+        .btn-primary { background: white; color: var(--brand-color); border-color: var(--border-color); }
+        .btn-primary:hover { background: #f0f8ff; border-color: var(--brand-color); }
 
         /* NIEUWE STIJL VOOR DE TITEL */
         .driver-title { margin: 0; font-size: 26px; font-weight: 300; color: var(--text-light); }
         .driver-name { font-weight: 700; color: var(--text-main); }
+
+        /* --- PRINT STYLES (PDF EXPORT) --- */
+        @media print {
+            /* Verberg elementen die niet op papier horen */
+            .sidebar, .top-header, .btn-action, .btn-add, .note-input, .app-footer, .no-print {
+                display: none !important;
+            }
+
+            /* Reset layout voor papier */
+            body, .main-content, .content-body {
+                display: block !important;
+                height: auto !important;
+                overflow: visible !important;
+                background: white !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+
+            .content-body { padding: 0 !important; }
+
+            /* Zorg dat de kolommen onder elkaar komen */
+            .col-left, .col-right {
+                width: 100% !important;
+                flex: none !important;
+                margin-bottom: 20px;
+            }
+
+            /* Maak kaarten strakker voor print */
+            .card {
+                box-shadow: none !important;
+                border: 1px solid #ccc !important;
+                break-inside: avoid; /* Voorkom dat kaarten middenin worden doorgeknipt */
+                margin-bottom: 15px !important;
+            }
+
+            .card-header {
+                background-color: #f0f0f0 !important;
+                border-bottom: 2px solid #ccc !important;
+                color: black !important;
+            }
+            
+            /* Lettertypes iets verkleinen/optimaliseren */
+            body { font-size: 12px; }
+            .driver-title { font-size: 20px; color: black !important; }
+            
+            /* Notities achtergrond wit maken */
+            .card-body[style*="background-color"] { background-color: white !important; }
+            .note-content { background: white !important; border: 1px solid #ddd; }
+        }
     </style>
 </head>
 <body>
@@ -155,9 +208,16 @@ $page_title = "Dossier Inzien";
                             Gesprek van <?php echo date('d-m-Y', strtotime($form['form_date'])); ?> • ID: <?php echo htmlspecialchars($form['employee_id']); ?>
                         </span>
                     </div>
-                    <a href="feedback_form.php?id=<?php echo $form_id; ?>" class="btn-edit">
-                        <span class="material-icons-outlined" style="font-size: 16px;">edit</span> Bewerken
-                    </a>
+                    
+                    <div class="no-print" style="display:flex; gap:10px;">
+                        <button onclick="window.print()" class="btn-action">
+                            <span class="material-icons-outlined" style="font-size: 18px;">print</span> Export PDF
+                        </button>
+                        
+                        <a href="feedback_form.php?id=<?php echo $form_id; ?>" class="btn-action btn-primary">
+                            <span class="material-icons-outlined" style="font-size: 16px;">edit</span> Bewerken
+                        </a>
+                    </div>
                 </div>
 
                 <div class="card">
@@ -167,7 +227,6 @@ $page_title = "Dossier Inzien";
                             <div class="label">OTD Score</div>
                             <div class="value">
                                 <?php 
-                                    // Bepaal kleur op basis van waarde > 96
                                     $otdVal = floatval($form['otd_score']);
                                     $otdClass = ($otdVal > 96) ? 'score-badge success' : 'score-badge';
                                 ?>
@@ -178,7 +237,6 @@ $page_title = "Dossier Inzien";
                             <div class="label">FTR Score</div>
                             <div class="value">
                                 <?php 
-                                    // Bepaal kleur op basis van waarde > 96
                                     $ftrVal = floatval($form['ftr_score']);
                                     $ftrClass = ($ftrVal > 96) ? 'score-badge success' : 'score-badge';
                                 ?>
@@ -235,14 +293,14 @@ $page_title = "Dossier Inzien";
                     </div>
                     <div class="card-body" style="background-color: #fcfcfc;">
                         
-                        <form method="POST" style="margin-bottom: 20px;">
+                        <form method="POST" style="margin-bottom: 20px;" class="no-print">
                             <input type="hidden" name="driver_id" value="<?php echo $form['driver_id']; ?>">
                             <textarea name="note_content" class="note-input" placeholder="Nieuwe afspraak of notitie toevoegen..." required></textarea>
                             <button type="submit" class="btn-add">Toevoegen</button>
                             <div style="clear:both;"></div>
                         </form>
 
-                        <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+                        <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" class="no-print">
 
                         <div class="timeline">
                             <?php if(empty($notes)): ?>
