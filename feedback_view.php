@@ -131,11 +131,21 @@ $page_title = "Dossier Inzien";
         .driver-title { margin: 0; font-size: 26px; font-weight: 300; color: var(--text-light); }
         .driver-name { font-weight: 700; color: var(--text-main); }
 
+        /* PRINT LOGO STANDAARD VERBERGEN */
+        .print-only-logo { display: none; }
+
         /* --- PRINT STYLES (PDF EXPORT) --- */
         @media print {
             /* Verberg elementen die niet op papier horen */
             .sidebar, .top-header, .btn-action, .btn-add, .note-input, .app-footer, .no-print {
                 display: none !important;
+            }
+
+            /* LOGO ZICHTBAAR MAKEN BIJ PRINTEN */
+            .print-only-logo {
+                display: block !important;
+                max-width: 180px; /* Pas formaat hier aan indien nodig */
+                margin-bottom: 20px;
             }
 
             /* Reset layout voor papier */
@@ -195,6 +205,8 @@ $page_title = "Dossier Inzien";
     <main class="main-content">
         
         <?php include __DIR__ . '/includes/header.php'; ?>
+        
+        <img src="https://i.imgur.com/qGySlgO.png" class="print-only-logo" alt="Logo">
         
         <div class="content-body">
             <div class="col-left">
