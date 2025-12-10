@@ -62,11 +62,10 @@ try {
     $stats['closed_feedback'] = $pdo->query("SELECT COUNT(*) FROM feedback_forms WHERE status = 'completed'")->fetchColumn();
 } catch (PDOException $e) {}
 
-// Haal teamleiders op (NU MET VOORNAAM/ACHTERNAAM)
+// Haal teamleiders op
 $teamleads = $pdo->query("SELECT id, email, first_name, last_name FROM users ORDER BY first_name ASC, last_name ASC")->fetchAll();
 
 // Recente Activiteiten
-// We halen hier ook de namen van de toegewezen user op (u_assigned.first_name etc.)
 $recentActivities = $pdo->query("SELECT 
             f.id, f.form_date, f.status, f.assigned_to_user_id,
             d.name as driver_name, d.employee_id,
@@ -105,6 +104,8 @@ $recentActivities = $pdo->query("SELECT
 
         .main-content { flex-grow: 1; display: flex; flex-direction: column; overflow-y: auto; }
         .top-header { height: 60px; background: white; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; padding: 0 24px; position: sticky; top: 0; z-index: 10; }
+        
+        /* Zorgt dat footer netjes onderaan komt */
         .page-body { padding: 24px; max-width: 1400px; margin: 0 auto; width: 100%; flex-grow: 1; }
 
         /* Cards & Grid */
@@ -120,10 +121,9 @@ $recentActivities = $pdo->query("SELECT
         th { text-align: left; padding: 10px; border-bottom: 1px solid var(--border-color); color: var(--text-secondary); font-weight: 600; text-transform: uppercase; font-size: 11px; }
         td { padding: 10px; border-bottom: 1px solid #eee; vertical-align: middle; }
         
-        /* INLINE EDIT STYLES (NIEUW) */
+        /* INLINE EDIT STYLES */
         .view-mode { display: flex; align-items: center; gap: 8px; }
         .edit-mode { display: none; align-items: center; gap: 4px; }
-        
         .icon-btn { cursor: pointer; color: #999; font-size: 16px; transition: color 0.2s; background: none; border: none; padding: 2px; }
         .icon-btn:hover { color: var(--brand-color); }
         .icon-btn.save { color: var(--success-text); }
@@ -132,18 +132,66 @@ $recentActivities = $pdo->query("SELECT
         .status-badge { padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
         .bg-open { background: #fffbeb; color: #b45309; border: 1px solid #fcd34d; }
         .bg-completed { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
-        
         .inline-select { padding: 4px; border: 1px solid #ccc; border-radius: 4px; font-size: 12px; }
 
-        /* Search & Header */
-        .header-search-trigger { background: #f3f2f2; border: 1px solid var(--border-color); border-radius: 6px; padding: 8px 12px; width: 250px; color: var(--text-secondary); font-size: 13px; display: flex; align-items: center; gap: 8px; cursor: text; }
-        #search-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.65); backdrop-filter: blur(12px); z-index: 9999; display: none; justify-content: center; padding-top: 15vh; }
-        .spotlight-container { width: 100%; max-width: 600px; background: white; border-radius: 12px; box-shadow: 0 20px 50px rgba(0,0,0,0.2); overflow: hidden; border: 1px solid #eee; }
+        /* Search & Header Styling */
+        .header-search-trigger { 
+            background: #f3f2f2; 
+            border: 1px solid var(--border-color); 
+            border-radius: 6px; 
+            padding: 8px 12px; 
+            width: 280px; 
+            color: var(--text-secondary); 
+            font-size: 13px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: space-between; /* Zorgt dat shortcut rechts staat */
+            cursor: pointer; 
+            transition: background 0.2s;
+        }
+        .header-search-trigger:hover { background: #e0e0e0; }
+        .shortcut-key {
+            background: #fff;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            padding: 0 6px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #666;
+        }
+
+        /* Verbeterde Search Overlay */
+        #search-overlay { 
+            position: fixed; 
+            top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(255,255,255,0.85); /* Iets lichter/glaziger */
+            backdrop-filter: blur(5px); 
+            z-index: 9999; 
+            display: none; 
+            justify-content: center; 
+            padding-top: 12vh; 
+        }
+        .spotlight-container { 
+            width: 100%; 
+            max-width: 500px; /* Smaller formaat */
+            background: white; 
+            border-radius: 12px; 
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);
+            overflow: hidden; 
+            border: 1px solid #e5e7eb; 
+            animation: slideDown 0.2s ease-out; /* Animatie toegevoegd */
+        }
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
         .spotlight-input-wrapper { display: flex; align-items: center; padding: 16px 20px; border-bottom: 1px solid #eee; }
-        #spotlight-input { border: none; font-size: 20px; width: 100%; outline: none; background: transparent; }
-        #spotlight-results { max-height: 400px; overflow-y: auto; }
-        .result-item { padding: 12px 20px; border-bottom: 1px solid #f7f7f7; cursor: pointer; display: flex; justify-content: space-between; }
-        .result-item:hover { background: #f0f4f8; }
+        #spotlight-input { border: none; font-size: 18px; width: 100%; outline: none; background: transparent; color: #333; }
+        #spotlight-results { max-height: 350px; overflow-y: auto; }
+        .result-item { padding: 12px 20px; border-bottom: 1px solid #f7f7f7; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+        .result-item:hover { background: #f0f9ff; border-left: 3px solid var(--brand-color); }
+        .result-sub { font-size: 12px; color: #999; }
     </style>
 </head>
 <body>
@@ -151,10 +199,15 @@ $recentActivities = $pdo->query("SELECT
     <div id="search-overlay">
         <div class="spotlight-container">
             <div class="spotlight-input-wrapper">
-                <span class="material-icons-outlined" style="margin-right:15px; color:#999; font-size:24px;">search</span>
-                <input type="text" id="spotlight-input" placeholder="Zoek dossier..." autocomplete="off">
+                <span class="material-icons-outlined" style="margin-right:12px; color:#999; font-size:22px;">search</span>
+                <input type="text" id="spotlight-input" placeholder="Zoek op naam of nummer..." autocomplete="off">
+                <span class="material-icons-outlined" style="cursor:pointer; color:#ccc;" onclick="closeSearch()">close</span>
             </div>
             <div id="spotlight-results"></div>
+            <div style="background:#fafafa; padding:8px 20px; font-size:11px; color:#999; border-top:1px solid #eee; display:flex; justify-content:space-between;">
+                <span>Druk op <strong>ESC</strong> om te sluiten</span>
+                <span>Zoekresultaten</span>
+            </div>
         </div>
     </div>
 
@@ -168,9 +221,13 @@ $recentActivities = $pdo->query("SELECT
 
     <main class="main-content">
         <header class="top-header">
-            <div class="header-search-trigger" onclick="document.getElementById('search-overlay').style.display='flex'; document.getElementById('spotlight-input').focus();">
-                <span class="material-icons-outlined" style="font-size:18px;">search</span> Zoeken...
+            <div class="header-search-trigger" onclick="openSearch()">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span class="material-icons-outlined" style="font-size:18px;">search</span> Zoeken...
+                </div>
+                <span class="shortcut-key">/</span>
             </div>
+
             <div style="font-size:13px; font-weight:600; display:flex; align-items:center; gap:8px;">
                 <span class="material-icons-outlined">account_circle</span> <?php echo htmlspecialchars($userEmail); ?>
                 <a href="logout.php" style="color:#777; text-decoration:none; margin-left:10px;"><span class="material-icons-outlined">logout</span></a>
@@ -240,7 +297,6 @@ $recentActivities = $pdo->query("SELECT
                                     <td>
                                         <div id="view-assign-<?php echo $row['id']; ?>" class="view-mode">
                                             <?php 
-                                                // Naam bepalen voor weergave
                                                 if (!empty($row['assigned_to_user_id'])) {
                                                     $displayName = (!empty($row['assigned_first']) || !empty($row['assigned_last'])) 
                                                         ? trim($row['assigned_first'] . ' ' . $row['assigned_last']) 
@@ -260,7 +316,6 @@ $recentActivities = $pdo->query("SELECT
                                             <select name="assign_user_id" class="inline-select">
                                                 <option value="">-- Geen --</option>
                                                 <?php foreach ($teamleads as $lead): 
-                                                    // Naam voor in de dropdown
                                                     $optName = (!empty($lead['first_name']) || !empty($lead['last_name'])) 
                                                         ? trim($lead['first_name'] . ' ' . $lead['last_name']) 
                                                         : $lead['email'];
@@ -285,6 +340,9 @@ $recentActivities = $pdo->query("SELECT
                 </div>
             </div>
         </div>
+
+        <?php include __DIR__ . '/includes/footer.php'; ?>
+
     </main>
 
     <script>
@@ -292,14 +350,10 @@ $recentActivities = $pdo->query("SELECT
         function toggleEdit(type, id) {
             const viewEl = document.getElementById(`view-${type}-${id}`);
             const editEl = document.getElementById(`edit-${type}-${id}`);
-            
-            // Wissel display styles
             if (viewEl.style.display === 'none') {
-                viewEl.style.display = 'flex';
-                editEl.style.display = 'none';
+                viewEl.style.display = 'flex'; editEl.style.display = 'none';
             } else {
-                viewEl.style.display = 'none';
-                editEl.style.display = 'flex';
+                viewEl.style.display = 'none'; editEl.style.display = 'flex';
             }
         }
 
@@ -308,8 +362,31 @@ $recentActivities = $pdo->query("SELECT
         const input = document.getElementById('spotlight-input');
         const resultsDiv = document.getElementById('spotlight-results');
 
-        overlay.addEventListener('click', (e) => { if(e.target===overlay) overlay.style.display='none'; });
-        document.addEventListener('keydown', (e) => { if(e.key==='Escape') overlay.style.display='none'; });
+        function openSearch() {
+            overlay.style.display = 'flex';
+            input.focus();
+        }
+
+        function closeSearch() {
+            overlay.style.display = 'none';
+            input.value = '';
+            resultsDiv.innerHTML = '';
+        }
+
+        // Sluit bij klik buiten de box
+        overlay.addEventListener('click', (e) => { if(e.target===overlay) closeSearch(); });
+        
+        // Keydown Events (ESC en /)
+        document.addEventListener('keydown', (e) => {
+            // Escape om te sluiten
+            if(e.key === 'Escape') closeSearch();
+            
+            // Slash (/) om te openen (tenzij je al aan het typen bent)
+            if(e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+                e.preventDefault(); // Voorkom dat de slash getypt wordt
+                openSearch();
+            }
+        });
 
         let timer;
         input.addEventListener('input', () => {
@@ -320,11 +397,17 @@ $recentActivities = $pdo->query("SELECT
                     .then(r => r.json())
                     .then(data => {
                         resultsDiv.innerHTML = '';
-                        if(data.length===0) resultsDiv.innerHTML='<div style="padding:10px; color:#999;">Geen resultaten</div>';
+                        if(data.length===0) resultsDiv.innerHTML='<div style="padding:15px; color:#999; text-align:center;">Geen resultaten gevonden</div>';
                         data.forEach(item => {
                             const d = document.createElement('div');
                             d.className='result-item';
-                            d.innerHTML=`<div><strong>${item.name}</strong> <small>(${item.form_date})</small></div>`;
+                            d.innerHTML=`
+                                <div>
+                                    <div style="font-weight:600; color:#333;">${item.name}</div>
+                                    <div class="result-sub">${item.employee_id || ''} • ${item.form_date}</div>
+                                </div>
+                                <span class="material-icons-outlined" style="color:#ccc; font-size:18px;">chevron_right</span>
+                            `;
                             d.onclick = () => window.location.href=`feedback_view.php?id=${item.form_id}`;
                             resultsDiv.appendChild(d);
                         });
