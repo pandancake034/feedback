@@ -1,7 +1,7 @@
 <?php
 /**
  * FEEDBACK_FORM.PHP
- * FIXED: Toegevoegd start_date veld & veilige afhandeling van lege velden.
+ * FIXED: Review Moment dropdown toegevoegd & opslaan in database.
  */
 
 require_once __DIR__ . '/config/config.php';
@@ -17,13 +17,14 @@ $is_new  = empty($form_id);
 $error   = "";
 $success = "";
 
-// Standaard waarden instellen (voorkomt "undefined variable" errors in de HTML)
+// Standaard waarden instellen
 $data = [
     'driver_name' => '', 
     'employee_id' => '', 
     'agency' => 'YoungCapital',
     'form_date' => date('Y-m-d'), 
-    'start_date' => date('Y-m-d', strtotime('-1 week')), // Standaard waarde
+    'start_date' => date('Y-m-d', strtotime('-1 week')),
+    'review_moment' => '', // NIEUW VELD
     'otd_score' => '', 
     'ftr_score' => '', 
     'kw_score' => '', 
@@ -61,7 +62,7 @@ if (!$is_new) {
 // --- 3. OPSLAAN (POST REQUEST) ---
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     
-    // Gegevens ophalen (met veilige ?? fallback om warnings te voorkomen)
+    // Gegevens ophalen (met veilige ?? fallback)
     $driver_name = trim($_POST['driver_name'] ?? '');
     $employee_id = trim($_POST['employee_id'] ?? '');
     
@@ -88,9 +89,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             // STAP B: Formulier Opslaan
             $new_status = (isset($_POST['action']) && $_POST['action'] === 'complete') ? 'completed' : 'open';
 
-            // Alle velden ophalen met fallback naar lege string of 0
+            // Alle velden ophalen
             $form_date       = $_POST['form_date'] ?? date('Y-m-d');
-            $start_date      = $_POST['start_date'] ?? date('Y-m-d'); // DEZE WAS DE OORZAAK VAN DE FOUT
+            $start_date      = $_POST['start_date'] ?? date('Y-m-d');
+            $review_moment   = $_POST['review_moment'] ?? ''; // NIEUW
             $agency          = $_POST['agency'] ?? '';
             $routes_count    = $_POST['routes_count'] ?? 0;
             $otd_score       = $_POST['otd_score'] ?? '';
@@ -105,26 +107,26 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $client_compliment  = $_POST['client_compliment'] ?? '';
 
             if ($is_new) {
-                // INSERT
+                // INSERT (review_moment toegevoegd)
                 $sql = "INSERT INTO feedback_forms (
-                            driver_id, created_by_user_id, form_date, start_date, agency,
+                            driver_id, created_by_user_id, form_date, start_date, review_moment, agency,
                             routes_count, otd_score, ftr_score, errors_text, nokd_text, late_text,
                             driving_behavior, warnings, kw_score, skills_rating, proficiency_rating, client_compliment,
                             status
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?, ?)";
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?, ?)";
                 
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute([
-                    $driver_id, $_SESSION['user_id'], $form_date, $start_date, $agency,
+                    $driver_id, $_SESSION['user_id'], $form_date, $start_date, $review_moment, $agency,
                     $routes_count, $otd_score, $ftr_score, $errors_text, $late_text,
                     $driving_behavior, $warnings, $kw_score, $skills_rating, $proficiency_rating, $client_compliment,
                     $new_status
                 ]);
                 
             } else {
-                // UPDATE
+                // UPDATE (review_moment toegevoegd)
                 $sql = "UPDATE feedback_forms SET 
-                            driver_id = ?, form_date = ?, start_date = ?, agency = ?,
+                            driver_id = ?, form_date = ?, start_date = ?, review_moment = ?, agency = ?,
                             routes_count = ?, otd_score = ?, ftr_score = ?, errors_text = ?, late_text = ?,
                             driving_behavior = ?, warnings = ?, kw_score = ?, skills_rating = ?, proficiency_rating = ?, client_compliment = ?,
                             status = ?, updated_at = NOW()
@@ -132,7 +134,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute([
-                    $driver_id, $form_date, $start_date, $agency,
+                    $driver_id, $form_date, $start_date, $review_moment, $agency,
                     $routes_count, $otd_score, $ftr_score, $errors_text, $late_text,
                     $driving_behavior, $warnings, $kw_score, $skills_rating, $proficiency_rating, $client_compliment,
                     $new_status, $form_id
@@ -233,6 +235,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                             <div class="form-group">
                                 <label>Startdatum Periode *</label>
                                 <input type="date" name="start_date" value="<?php echo htmlspecialchars($data['start_date']); ?>" required>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Review Moment</label>
+                                <select name="review_moment">
+                                    <option value="">-- Kies --</option>
+                                    <option value="8 weken" <?php if($data['review_moment'] == '8 weken') echo 'selected'; ?>>8 weken</option>
+                                    <option value="26 weken" <?php if($data['review_moment'] == '26 weken') echo 'selected'; ?>>26 weken</option>
+                                    <option value="52 weken" <?php if($data['review_moment'] == '52 weken') echo 'selected'; ?>>52 weken</option>
+                                </select>
                             </div>
 
                         </div>
