@@ -22,7 +22,7 @@
 
 <footer class="app-footer">
     <div>
-        &copy; <?php echo date('Y'); ?> LogistiekApp. Alle rechten voorbehouden.
+        &copy; <?php echo date('Y'); ?> FeedbackFlow | Alle rechten voorbehouden.
     </div>
     <div class="footer-links">
         <a href="#">Privacy</a>
