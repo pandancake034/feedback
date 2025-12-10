@@ -65,7 +65,7 @@ try {
 // Haal teamleiders op
 $teamleads = $pdo->query("SELECT id, email, first_name, last_name FROM users ORDER BY first_name ASC, last_name ASC")->fetchAll();
 
-// Recente Activiteiten (QUERY AANGEPAST: f.start_date toegevoegd)
+// Recente Activiteiten (QUERY AANGEPAST: f.review_moment toegevoegd)
 $recentActivities = $pdo->query("SELECT 
             f.id, f.form_date, f.review_moment, f.status, f.assigned_to_user_id,
             d.name as driver_name, d.employee_id,
@@ -271,12 +271,7 @@ $recentActivities = $pdo->query("SELECT
                                     </td>
                                     
                                     <td>
-                                        <?php 
-                                            // Format datum als hij bestaat, anders '-'
-                                            echo !empty($row['start_date']) 
-                                                ? date('d-m-Y', strtotime($row['start_date'])) 
-                                                : '-'; 
-                                        ?>
+                                        <?php echo htmlspecialchars($row['review_moment'] ?? '-'); ?>
                                     </td>
 
                                     <td><?php echo htmlspecialchars($row['creator_email']); ?></td>
