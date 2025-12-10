@@ -70,13 +70,8 @@ $page_title = "Dossier Inzien";
 
         /* Layout Main */
         .sidebar { width: 240px; background: #1a2233; color: white; flex-shrink: 0; display: flex; flex-direction: column; }
-        /* AANGEPAST: Main content is nu een kolom (voor header + body) */
         .main-content { flex-grow: 1; display: flex; flex-direction: column; overflow-y: auto; }
         
-        /* Header CSS (Kopie van dashboard of aangepast voor include) */
-        .top-header { height: 60px; background: white; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; padding: 0 24px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); flex-shrink: 0; }
-        .user-profile { display: flex; align-items: center; gap: 12px; font-size: 13px; font-weight: 600; }
-
         /* Content Wrapper voor de 2 kolommen */
         .content-body { padding: 24px; display: flex; gap: 24px; flex-grow: 1; }
         
@@ -95,8 +90,9 @@ $page_title = "Dossier Inzien";
         .label { width: 140px; color: var(--text-light); font-size: 13px; font-weight: 600; flex-shrink: 0; }
         .value { font-size: 14px; color: var(--text-main); line-height: 1.4; }
         
-        /* Scores Visuals */
+        /* Scores Visuals - UPDATE: Success variant toegevoegd */
         .score-badge { display: inline-block; padding: 4px 8px; border-radius: 4px; background: #e0e7ff; color: #3730a3; font-weight: 700; font-size: 13px; }
+        .score-badge.success { background: #d1fae5; color: #065f46; } /* Groen bij > 96 */
         
         /* Timeline / Notes */
         .timeline { margin-top: 15px; }
@@ -115,19 +111,8 @@ $page_title = "Dossier Inzien";
         .btn-edit:hover { background-color: #f3f2f2; }
 
         /* NIEUWE STIJL VOOR DE TITEL */
-        .driver-title {
-            margin: 0;
-            font-size: 26px; 
-            font-weight: 300; /* Light/Modern */
-            color: var(--text-light);
-        }
-        .driver-name {
-            font-weight: 700;
-            color: var(--text-main);
-        }
-
-        /* Footer Sticky maken in flex container */
-        .app-footer { margin-top: auto; }
+        .driver-title { margin: 0; font-size: 26px; font-weight: 300; color: var(--text-light); }
+        .driver-name { font-weight: 700; color: var(--text-main); }
     </style>
 </head>
 <body>
@@ -167,11 +152,25 @@ $page_title = "Dossier Inzien";
                     <div class="card-body">
                         <div class="detail-row">
                             <div class="label">OTD Score</div>
-                            <div class="value"><span class="score-badge"><?php echo htmlspecialchars($form['otd_score'] ?: '-'); ?></span></div>
+                            <div class="value">
+                                <?php 
+                                    // Bepaal kleur op basis van waarde > 96
+                                    $otdVal = floatval($form['otd_score']);
+                                    $otdClass = ($otdVal > 96) ? 'score-badge success' : 'score-badge';
+                                ?>
+                                <span class="<?php echo $otdClass; ?>"><?php echo htmlspecialchars($form['otd_score'] ?: '-'); ?></span>
+                            </div>
                         </div>
                         <div class="detail-row">
                             <div class="label">FTR Score</div>
-                            <div class="value"><span class="score-badge"><?php echo htmlspecialchars($form['ftr_score'] ?: '-'); ?></span></div>
+                            <div class="value">
+                                <?php 
+                                    // Bepaal kleur op basis van waarde > 96
+                                    $ftrVal = floatval($form['ftr_score']);
+                                    $ftrClass = ($ftrVal > 96) ? 'score-badge success' : 'score-badge';
+                                ?>
+                                <span class="<?php echo $ftrClass; ?>"><?php echo htmlspecialchars($form['ftr_score'] ?: '-'); ?></span>
+                            </div>
                         </div>
                         <div class="detail-row">
                             <div class="label">KW Score</div>
