@@ -2,6 +2,7 @@
 /**
  * ADMIN/INDEX.PHP
  * Beheer gebruikers (CRUD) & Bekijk statistieken.
+ * UPDATE: Nu met Voornaam & Achternaam
  */
 
 require_once __DIR__ . '/../config/config.php';
@@ -27,13 +28,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // A. GEBRUIKER TOEVOEGEN
     if (isset($_POST['action']) && $_POST['action'] === 'create') {
         try {
-            if (empty($_POST['email']) || empty($_POST['password'])) throw new Exception("Vul alle velden in.");
+            if (empty($_POST['email']) || empty($_POST['password'])) throw new Exception("Vul minimaal e-mail en wachtwoord in.");
             
-            $stmt = $pdo->prepare("INSERT INTO users (email, password, role) VALUES (?, ?, ?)");
+            $stmt = $pdo->prepare("INSERT INTO users (first_name, last_name, email, password, role) VALUES (?, ?, ?, ?, ?)");
             $hash = password_hash($_POST['password'], PASSWORD_DEFAULT);
             $role = $_POST['role'] ?? 'user';
             
-            $stmt->execute([$_POST['email'], $hash, $role]);
+            // Nieuwe velden ophalen (mogen leeg zijn, maar we slaan ze wel op)
+            $firstName = trim($_POST['first_name'] ?? '');
+            $lastName = trim($_POST['last_name'] ?? '');
+            
+            $stmt->execute([$firstName, $lastName, $_POST['email'], $hash, $role]);
             header("Location: index.php?msg=created"); exit;
         } catch (Exception $e) { $error = $e->getMessage(); }
     }
@@ -44,15 +49,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $id = $_POST['user_id'];
             $email = $_POST['email'];
             $role = $_POST['role'];
+            $firstName = trim($_POST['first_name'] ?? '');
+            $lastName = trim($_POST['last_name'] ?? '');
             
             // Als wachtwoord veld leeg is, updaten we die niet
             if (!empty($_POST['password'])) {
                 $hash = password_hash($_POST['password'], PASSWORD_DEFAULT);
-                $stmt = $pdo->prepare("UPDATE users SET email = ?, role = ?, password = ? WHERE id = ?");
-                $stmt->execute([$email, $role, $hash, $id]);
+                $stmt = $pdo->prepare("UPDATE users SET first_name = ?, last_name = ?, email = ?, role = ?, password = ? WHERE id = ?");
+                $stmt->execute([$firstName, $lastName, $email, $role, $hash, $id]);
             } else {
-                $stmt = $pdo->prepare("UPDATE users SET email = ?, role = ? WHERE id = ?");
-                $stmt->execute([$email, $role, $id]);
+                $stmt = $pdo->prepare("UPDATE users SET first_name = ?, last_name = ?, email = ?, role = ? WHERE id = ?");
+                $stmt->execute([$firstName, $lastName, $email, $role, $id]);
             }
             header("Location: index.php?msg=updated"); exit;
         } catch (Exception $e) { $error = $e->getMessage(); }
@@ -76,7 +83,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // A. Statistieken: Aantal toegewezen gesprekken per gebruiker
 // We gebruiken een LEFT JOIN om ook users te tonen die 0 gesprekken hebben
-$statsQuery = "SELECT u.id, u.email, COUNT(f.id) as assigned_count 
+$statsQuery = "SELECT u.id, u.first_name, u.last_name, u.email, COUNT(f.id) as assigned_count 
                FROM users u 
                LEFT JOIN feedback_forms f ON u.id = f.assigned_to_user_id 
                GROUP BY u.id 
@@ -163,6 +170,8 @@ if (isset($_GET['msg'])) {
         .form-group label { display: block; margin-bottom: 6px; font-size: 13px; font-weight: 600; color: var(--text-secondary); }
         .form-control { width: 100%; padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 14px; }
         .modal-footer { padding: 16px 20px; background: #f8f9fa; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 10px; }
+        
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
     </style>
 </head>
 <body>
@@ -223,7 +232,15 @@ if (isset($_GET['msg'])) {
                     <div class="card-body">
                         <div class="stat-number"><?php echo $stat['assigned_count']; ?></div>
                         <div class="stat-label">Gesprekken</div>
-                        <div style="font-size:13px; margin-top:4px; font-weight:600;"><?php echo htmlspecialchars($stat['email']); ?></div>
+                        <div style="font-size:13px; margin-top:4px; font-weight:600;">
+                            <?php 
+                                // Toon naam indien beschikbaar, anders email
+                                $displayName = (!empty($stat['first_name']) || !empty($stat['last_name'])) 
+                                    ? $stat['first_name'] . ' ' . $stat['last_name'] 
+                                    : $stat['email'];
+                                echo htmlspecialchars($displayName); 
+                            ?>
+                        </div>
                     </div>
                 </div>
                 <?php endforeach; ?>
@@ -235,7 +252,7 @@ if (isset($_GET['msg'])) {
                     <table>
                         <thead>
                             <tr>
-                                <th>ID</th>
+                                <th>Naam</th>
                                 <th>E-mailadres</th>
                                 <th>Rol</th>
                                 <th>Laatst Ingelogd</th>
@@ -245,7 +262,9 @@ if (isset($_GET['msg'])) {
                         <tbody>
                             <?php foreach ($users as $user): ?>
                             <tr>
-                                <td><?php echo $user['id']; ?></td>
+                                <td>
+                                    <strong><?php echo htmlspecialchars($user['first_name'] . ' ' . $user['last_name']); ?></strong>
+                                </td>
                                 <td><?php echo htmlspecialchars($user['email']); ?></td>
                                 <td>
                                     <span class="badge <?php echo ($user['role'] === 'admin') ? 'badge-admin' : 'badge-user'; ?>">
@@ -289,8 +308,19 @@ if (isset($_GET['msg'])) {
                     <input type="hidden" name="action" id="formAction" value="create">
                     <input type="hidden" name="user_id" id="userId">
 
+                    <div class="grid-2">
+                        <div class="form-group">
+                            <label>Voornaam</label>
+                            <input type="text" name="first_name" id="inputFirstName" class="form-control" placeholder="Jan">
+                        </div>
+                        <div class="form-group">
+                            <label>Achternaam</label>
+                            <input type="text" name="last_name" id="inputLastName" class="form-control" placeholder="Jansen">
+                        </div>
+                    </div>
+
                     <div class="form-group">
-                        <label>E-mailadres</label>
+                        <label>E-mailadres *</label>
                         <input type="email" name="email" id="inputEmail" class="form-control" required>
                     </div>
 
@@ -321,9 +351,13 @@ if (isset($_GET['msg'])) {
         const modalTitle = document.getElementById('modalTitle');
         const formAction = document.getElementById('formAction');
         const userId = document.getElementById('userId');
+        
+        const inputFirstName = document.getElementById('inputFirstName');
+        const inputLastName = document.getElementById('inputLastName');
         const inputEmail = document.getElementById('inputEmail');
         const inputRole = document.getElementById('inputRole');
         const inputPass = document.getElementById('inputPass');
+        
         const passLabel = document.getElementById('passLabel');
         const passHelp = document.getElementById('passHelp');
 
@@ -334,8 +368,12 @@ if (isset($_GET['msg'])) {
                 modalTitle.textContent = 'Nieuwe Gebruiker Aanmaken';
                 formAction.value = 'create';
                 userId.value = '';
+                
+                inputFirstName.value = '';
+                inputLastName.value = '';
                 inputEmail.value = '';
                 inputRole.value = 'user';
+                
                 inputPass.required = true;
                 passLabel.textContent = 'Wachtwoord *';
                 passHelp.style.display = 'none';
@@ -343,8 +381,12 @@ if (isset($_GET['msg'])) {
                 modalTitle.textContent = 'Gebruiker Bewerken';
                 formAction.value = 'edit';
                 userId.value = userData.id;
+                
+                inputFirstName.value = userData.first_name || '';
+                inputLastName.value = userData.last_name || '';
                 inputEmail.value = userData.email;
                 inputRole.value = userData.role;
+                
                 inputPass.value = '';
                 inputPass.required = false;
                 passLabel.textContent = 'Wachtwoord (Optioneel)';
