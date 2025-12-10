@@ -65,9 +65,9 @@ try {
 // Haal teamleiders op
 $teamleads = $pdo->query("SELECT id, email, first_name, last_name FROM users ORDER BY first_name ASC, last_name ASC")->fetchAll();
 
-// Recente Activiteiten
+// Recente Activiteiten (QUERY AANGEPAST: f.start_date toegevoegd)
 $recentActivities = $pdo->query("SELECT 
-            f.id, f.form_date, f.status, f.assigned_to_user_id,
+            f.id, f.form_date, f.start_date, f.status, f.assigned_to_user_id,
             d.name as driver_name, d.employee_id,
             u_creator.email as creator_email, 
             u_assigned.email as assigned_email,
@@ -103,7 +103,21 @@ $recentActivities = $pdo->query("SELECT
         .nav-item .material-icons-outlined { margin-right: 12px; }
 
         .main-content { flex-grow: 1; display: flex; flex-direction: column; overflow-y: auto; }
-        .top-header { height: 60px; background: white; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; padding: 0 24px; position: sticky; top: 0; z-index: 10; }
+        
+        /* Header Fix */
+        .top-header { 
+            height: 60px; 
+            background: white; 
+            border-bottom: 1px solid var(--border-color); 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            padding: 0 24px; 
+            position: sticky; 
+            top: 0; 
+            z-index: 10;
+            flex-shrink: 0; 
+        }
         
         /* Zorgt dat footer netjes onderaan komt */
         .page-body { padding: 24px; max-width: 1400px; margin: 0 auto; width: 100%; flex-grow: 1; }
@@ -145,46 +159,26 @@ $recentActivities = $pdo->query("SELECT
             font-size: 13px; 
             display: flex; 
             align-items: center; 
-            justify-content: space-between; /* Zorgt dat shortcut rechts staat */
+            justify-content: space-between; 
             cursor: pointer; 
             transition: background 0.2s;
         }
         .header-search-trigger:hover { background: #e0e0e0; }
-        .shortcut-key {
-            background: #fff;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            padding: 0 6px;
-            font-size: 11px;
-            font-weight: 600;
-            color: #666;
-        }
+        .shortcut-key { background: #fff; border: 1px solid #ccc; border-radius: 4px; padding: 0 6px; font-size: 11px; font-weight: 600; color: #666; }
 
-        /* Verbeterde Search Overlay */
+        /* Search Overlay */
         #search-overlay { 
-            position: fixed; 
-            top: 0; left: 0; width: 100%; height: 100%; 
-            background: rgba(255,255,255,0.85); /* Iets lichter/glaziger */
-            backdrop-filter: blur(5px); 
-            z-index: 9999; 
-            display: none; 
-            justify-content: center; 
-            padding-top: 12vh; 
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(255,255,255,0.85); backdrop-filter: blur(5px); 
+            z-index: 9999; display: none; justify-content: center; padding-top: 12vh; 
         }
         .spotlight-container { 
-            width: 100%; 
-            max-width: 500px; /* Smaller formaat */
-            background: white; 
-            border-radius: 12px; 
-            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);
-            overflow: hidden; 
-            border: 1px solid #e5e7eb; 
-            animation: slideDown 0.2s ease-out; /* Animatie toegevoegd */
+            width: 100%; max-width: 500px; background: white; 
+            border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);
+            overflow: hidden; border: 1px solid #e5e7eb; 
+            animation: slideDown 0.2s ease-out; 
         }
-        @keyframes slideDown {
-            from { opacity: 0; transform: translateY(-10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
 
         .spotlight-input-wrapper { display: flex; align-items: center; padding: 16px 20px; border-bottom: 1px solid #eee; }
         #spotlight-input { border: none; font-size: 18px; width: 100%; outline: none; background: transparent; color: #333; }
@@ -257,7 +251,12 @@ $recentActivities = $pdo->query("SELECT
                     <table style="width: 100%;">
                         <thead>
                             <tr>
-                                <th>Datum</th><th>Chauffeur</th><th>Gemaakt Door</th><th>Status</th><th>Toegewezen Aan</th><th style="text-align:right;">Actie</th>
+                                <th>Datum</th>
+                                <th>Chauffeur</th>
+                                <th>Review Moment</th> <th>Gemaakt Door</th>
+                                <th>Status</th>
+                                <th>Toegewezen Aan</th>
+                                <th style="text-align:right;">Actie</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -270,6 +269,16 @@ $recentActivities = $pdo->query("SELECT
                                         </a>
                                         <div style="font-size:11px; color:#999;"><?php echo htmlspecialchars($row['employee_id'] ?? ''); ?></div>
                                     </td>
+                                    
+                                    <td>
+                                        <?php 
+                                            // Format datum als hij bestaat, anders '-'
+                                            echo !empty($row['start_date']) 
+                                                ? date('d-m-Y', strtotime($row['start_date'])) 
+                                                : '-'; 
+                                        ?>
+                                    </td>
+
                                     <td><?php echo htmlspecialchars($row['creator_email']); ?></td>
 
                                     <td>
@@ -381,9 +390,9 @@ $recentActivities = $pdo->query("SELECT
             // Escape om te sluiten
             if(e.key === 'Escape') closeSearch();
             
-            // Slash (/) om te openen (tenzij je al aan het typen bent)
+            // Slash (/) om te openen
             if(e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
-                e.preventDefault(); // Voorkom dat de slash getypt wordt
+                e.preventDefault(); 
                 openSearch();
             }
         });
