@@ -6,7 +6,7 @@
 session_start();
 
 // 1. ALGEMENE INSTELLINGEN
-define('APP_TITLE', 'Driver Feedback | HUB Nieuwegein'); // <--- HIER IS JE NIEUWE TITEL
+define('APP_TITLE', 'FeedbackFlow | HUB Nieuwegein'); // <--- HIER IS JE NIEUWE TITEL
 
 // 2. DATABASE INSTELLINGEN
 define('DB_HOST', 'localhost');
