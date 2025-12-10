@@ -72,6 +72,19 @@ $page_title = "Dossier Inzien";
         .sidebar { width: 240px; background: #1a2233; color: white; flex-shrink: 0; display: flex; flex-direction: column; }
         .main-content { flex-grow: 1; display: flex; flex-direction: column; overflow-y: auto; }
         
+        /* HEADER CSS (DIE MISTE) */
+        .top-header { 
+            height: 60px; 
+            background: white; 
+            border-bottom: 1px solid var(--border-color); 
+            display: flex; 
+            align-items: center; 
+            justify-content: space-between; 
+            padding: 0 24px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02); 
+            flex-shrink: 0; /* Belangrijk: zorgt dat header niet verdwijnt */
+        }
+
         /* Content Wrapper voor de 2 kolommen */
         .content-body { padding: 24px; display: flex; gap: 24px; flex-grow: 1; }
         
