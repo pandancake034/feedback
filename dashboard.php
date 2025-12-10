@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/config/config.php';
 require_once __DIR__ . '/config/db.php';
+include __DIR__ . '/includes/sidebar.php';
 
 // 1. BEVEILIGING
 if (!isset($_SESSION['user_id'])) {
@@ -204,14 +205,6 @@ $recentActivities = $pdo->query("SELECT
             </div>
         </div>
     </div>
-
-    <aside class="sidebar">
-        <div class="sidebar-header"><img src="https://i.imgur.com/qGySlgO.png" alt="Logo" class="sidebar-logo"></div>
-        <ul class="nav-list">
-            <li class="nav-item"><a href="dashboard.php" class="active"><span class="material-icons-outlined">dashboard</span> Dashboard</a></li>
-            <li class="nav-item"><a href="feedback_form.php"><span class="material-icons-outlined">add_circle</span> Nieuw Gesprek</a></li>
-        </ul>
-    </aside>
 
     <main class="main-content">
         <header class="top-header">
