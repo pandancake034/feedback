@@ -162,7 +162,7 @@ $recentActivities = $pdo->query("SELECT
         <div class="sidebar-header"><img src="https://i.imgur.com/qGySlgO.png" alt="Logo" class="sidebar-logo"></div>
         <ul class="nav-list">
             <li class="nav-item"><a href="dashboard.php" class="active"><span class="material-icons-outlined">dashboard</span> Dashboard</a></li>
-            <li class="nav-item"><a href="feedback_create.php"><span class="material-icons-outlined">add_circle</span> Nieuw Gesprek</a></li>
+            <li class="nav-item"><a href="feedback_form.php"><span class="material-icons-outlined">add_circle</span> Nieuw Gesprek</a></li>
         </ul>
     </aside>
 
@@ -181,7 +181,7 @@ $recentActivities = $pdo->query("SELECT
             
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
                 <h1>Dashboard</h1>
-                <a href="feedback_create.php" class="btn-brand"><span class="material-icons-outlined">add</span> Nieuw Gesprek</a>
+                <a href="feedback_form.php" class="btn-brand"><span class="material-icons-outlined">add</span> Nieuw Gesprek</a>
             </div>
 
             <?php if ($msg): ?>
