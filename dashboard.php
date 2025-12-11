@@ -1,7 +1,12 @@
 <?php
+/**
+ * DASHBOARD.PHP
+ * - Fix: AJAX Search verplaatst naar boven (voorkomt HTML in JSON response)
+ * - Feature: Paginering toegevoegd (max 8 per pagina)
+ */
+
 require_once __DIR__ . '/config/config.php';
 require_once __DIR__ . '/config/db.php';
-include __DIR__ . '/includes/sidebar.php';
 
 // 1. BEVEILIGING
 if (!isset($_SESSION['user_id'])) {
@@ -9,12 +14,17 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
-// --- AJAX HANDLER VOOR LIVE SUGGESTIES ---
+// --- AJAX HANDLER VOOR LIVE SUGGESTIES (MOET BOVENAAN STAAN!) ---
 if (isset($_GET['ajax_search'])) {
+    // Zet header op JSON zodat de browser dit snapt
     header('Content-Type: application/json');
+    
     $term = trim($_GET['ajax_search']);
     
-    if (strlen($term) < 1) { echo json_encode([]); exit; }
+    if (strlen($term) < 1) { 
+        echo json_encode([]); 
+        exit; 
+    }
 
     try {
         $sql = "SELECT d.id as driver_id, d.name, d.employee_id, f.id as form_id, f.form_date, f.status 
@@ -26,9 +36,15 @@ if (isset($_GET['ajax_search'])) {
         $like = "%$term%";
         $stmt->execute([$like, $like]);
         echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
-    } catch (PDOException $e) { echo json_encode(['error' => $e->getMessage()]); }
+    } catch (PDOException $e) { 
+        echo json_encode(['error' => $e->getMessage()]); 
+    }
+    // Stop direct, anders wordt de rest van de pagina (HTML) ook meegestuurd!
     exit;
 }
+
+// Nu pas HTML includes laden
+include __DIR__ . '/includes/sidebar.php';
 
 // 2. LOGICA: OPSLAAN (POST)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -55,7 +71,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $userEmail = $_SESSION['email'];
 $msg = $_GET['msg'] ?? '';
 
-// Statistieken
+// Statistieken (KPI's)
 $stats = ['drivers' => 0, 'open_feedback' => 0, 'closed_feedback' => 0];
 try {
     $stats['drivers'] = $pdo->query("SELECT COUNT(*) FROM drivers")->fetchColumn();
@@ -63,11 +79,25 @@ try {
     $stats['closed_feedback'] = $pdo->query("SELECT COUNT(*) FROM feedback_forms WHERE status = 'completed'")->fetchColumn();
 } catch (PDOException $e) {}
 
-// Haal teamleiders op
+// Haal teamleiders op (voor dropdown)
 $teamleads = $pdo->query("SELECT id, email, first_name, last_name FROM users ORDER BY first_name ASC, last_name ASC")->fetchAll();
 
-// Recente Activiteiten (QUERY AANGEPAST: f.review_moment toegevoegd)
-$recentActivities = $pdo->query("SELECT 
+// --- PAGINERING LOGICA ---
+$limit = 8; // Maximaal 8 dossiers per pagina
+$page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int)$_GET['page'] : 1;
+if ($page < 1) $page = 1;
+
+// Totaal aantal rijen tellen voor paginering
+$totalRows = $pdo->query("SELECT COUNT(*) FROM feedback_forms")->fetchColumn();
+$totalPages = ceil($totalRows / $limit);
+
+// Zorg dat we niet op pagina 10 zitten als er maar 5 pagina's zijn
+if ($page > $totalPages && $totalPages > 0) { $page = $totalPages; }
+
+$offset = ($page - 1) * $limit;
+
+// Recente Activiteiten Ophalen (Met LIMIT en OFFSET)
+$sqlActivities = "SELECT 
             f.id, f.form_date, f.review_moment, f.status, f.assigned_to_user_id,
             d.name as driver_name, d.employee_id,
             u_creator.email as creator_email, 
@@ -78,7 +108,14 @@ $recentActivities = $pdo->query("SELECT
         JOIN drivers d ON f.driver_id = d.id
         JOIN users u_creator ON f.created_by_user_id = u_creator.id
         LEFT JOIN users u_assigned ON f.assigned_to_user_id = u_assigned.id
-        ORDER BY f.created_at DESC LIMIT 20")->fetchAll();
+        ORDER BY f.created_at DESC 
+        LIMIT :limit OFFSET :offset";
+
+$stmt = $pdo->prepare($sqlActivities);
+$stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+$stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+$stmt->execute();
+$recentActivities = $stmt->fetchAll();
 ?>
 <!DOCTYPE html>
 <html lang="nl">
@@ -120,7 +157,6 @@ $recentActivities = $pdo->query("SELECT
             flex-shrink: 0; 
         }
         
-        /* Zorgt dat footer netjes onderaan komt */
         .page-body { padding: 24px; max-width: 1400px; margin: 0 auto; width: 100%; flex-grow: 1; }
 
         /* Cards & Grid */
@@ -136,6 +172,13 @@ $recentActivities = $pdo->query("SELECT
         th { text-align: left; padding: 10px; border-bottom: 1px solid var(--border-color); color: var(--text-secondary); font-weight: 600; text-transform: uppercase; font-size: 11px; }
         td { padding: 10px; border-bottom: 1px solid #eee; vertical-align: middle; }
         
+        /* Pagination Styling */
+        .pagination { padding: 15px; border-top: 1px solid #eee; display: flex; justify-content: flex-end; align-items: center; gap: 10px; font-size: 13px; }
+        .pagination a { text-decoration: none; padding: 6px 12px; border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-main); transition: 0.2s; }
+        .pagination a:hover { background: #f3f2f2; }
+        .pagination .current { color: var(--text-secondary); font-weight: 600; }
+        .pagination .disabled { opacity: 0.5; pointer-events: none; }
+
         /* INLINE EDIT STYLES */
         .view-mode { display: flex; align-items: center; gap: 8px; }
         .edit-mode { display: none; align-items: center; gap: 4px; }
@@ -253,88 +296,112 @@ $recentActivities = $pdo->query("SELECT
                             </tr>
                         </thead>
                         <tbody>
-                            <?php foreach ($recentActivities as $row): ?>
+                            <?php if (empty($recentActivities)): ?>
                                 <tr>
-                                    <td><?php echo htmlspecialchars($row['form_date']); ?></td>
-                                    <td>
-                                        <a href="feedback_view.php?id=<?php echo $row['id']; ?>" style="color:var(--brand-color); text-decoration:none; font-weight:700;">
-                                            <?php echo htmlspecialchars($row['driver_name']); ?>
-                                        </a>
-                                        <div style="font-size:11px; color:#999;"><?php echo htmlspecialchars($row['employee_id'] ?? ''); ?></div>
-                                    </td>
-                                    
-                                    <td>
-                                        <?php echo htmlspecialchars($row['review_moment'] ?? '-'); ?>
-                                    </td>
-
-                                    <td><?php echo htmlspecialchars($row['creator_email']); ?></td>
-
-                                    <td>
-                                        <div id="view-status-<?php echo $row['id']; ?>" class="view-mode">
-                                            <span class="status-badge <?php echo ($row['status'] === 'open') ? 'bg-open' : 'bg-completed'; ?>">
-                                                <?php echo ucfirst($row['status']); ?>
-                                            </span>
-                                            <button class="icon-btn" onclick="toggleEdit('status', <?php echo $row['id']; ?>)" title="Bewerken">
-                                                <span class="material-icons-outlined" style="font-size:14px;">edit</span>
-                                            </button>
-                                        </div>
-                                        
-                                        <form method="POST" id="edit-status-<?php echo $row['id']; ?>" class="edit-mode">
-                                            <input type="hidden" name="form_id" value="<?php echo $row['id']; ?>">
-                                            <input type="hidden" name="update_status" value="1">
-                                            <select name="new_status" class="inline-select">
-                                                <option value="open" <?php if($row['status'] === 'open') echo 'selected'; ?>>Open</option>
-                                                <option value="completed" <?php if($row['status'] === 'completed') echo 'selected'; ?>>Completed</option>
-                                            </select>
-                                            <button type="submit" class="icon-btn save" title="Opslaan"><span class="material-icons-outlined">check</span></button>
-                                            <button type="button" class="icon-btn cancel" title="Annuleren" onclick="toggleEdit('status', <?php echo $row['id']; ?>)"><span class="material-icons-outlined">close</span></button>
-                                        </form>
-                                    </td>
-                                    
-                                    <td>
-                                        <div id="view-assign-<?php echo $row['id']; ?>" class="view-mode">
-                                            <?php 
-                                                if (!empty($row['assigned_to_user_id'])) {
-                                                    $displayName = (!empty($row['assigned_first']) || !empty($row['assigned_last'])) 
-                                                        ? trim($row['assigned_first'] . ' ' . $row['assigned_last']) 
-                                                        : $row['assigned_email'];
-                                                } else {
-                                                    $displayName = '<span style="color:#bbb; font-style:italic;">-- Niet toegewezen --</span>';
-                                                }
-                                                echo $displayName;
-                                            ?>
-                                            <button class="icon-btn" onclick="toggleEdit('assign', <?php echo $row['id']; ?>)" title="Bewerken">
-                                                <span class="material-icons-outlined" style="font-size:14px;">edit</span>
-                                            </button>
-                                        </div>
-
-                                        <form method="POST" id="edit-assign-<?php echo $row['id']; ?>" class="edit-mode">
-                                            <input type="hidden" name="form_id" value="<?php echo $row['id']; ?>">
-                                            <select name="assign_user_id" class="inline-select">
-                                                <option value="">-- Geen --</option>
-                                                <?php foreach ($teamleads as $lead): 
-                                                    $optName = (!empty($lead['first_name']) || !empty($lead['last_name'])) 
-                                                        ? trim($lead['first_name'] . ' ' . $lead['last_name']) 
-                                                        : $lead['email'];
-                                                ?>
-                                                    <option value="<?php echo $lead['id']; ?>" <?php if($row['assigned_to_user_id'] == $lead['id']) echo 'selected'; ?>>
-                                                        <?php echo htmlspecialchars($optName); ?>
-                                                    </option>
-                                                <?php endforeach; ?>
-                                            </select>
-                                            <button type="submit" class="icon-btn save" title="Opslaan"><span class="material-icons-outlined">check</span></button>
-                                            <button type="button" class="icon-btn cancel" title="Annuleren" onclick="toggleEdit('assign', <?php echo $row['id']; ?>)"><span class="material-icons-outlined">close</span></button>
-                                        </form>
-                                    </td>
-
-                                    <td style="text-align:right;">
-                                        <a href="feedback_view.php?id=<?php echo $row['id']; ?>" style="color:#999;"><span class="material-icons-outlined">visibility</span></a>
-                                    </td>
+                                    <td colspan="7" style="text-align: center; color: #999;">Geen dossiers gevonden op deze pagina.</td>
                                 </tr>
-                            <?php endforeach; ?>
+                            <?php else: ?>
+                                <?php foreach ($recentActivities as $row): ?>
+                                    <tr>
+                                        <td><?php echo htmlspecialchars($row['form_date']); ?></td>
+                                        <td>
+                                            <a href="feedback_view.php?id=<?php echo $row['id']; ?>" style="color:var(--brand-color); text-decoration:none; font-weight:700;">
+                                                <?php echo htmlspecialchars($row['driver_name']); ?>
+                                            </a>
+                                            <div style="font-size:11px; color:#999;"><?php echo htmlspecialchars($row['employee_id'] ?? ''); ?></div>
+                                        </td>
+                                        
+                                        <td>
+                                            <?php echo htmlspecialchars($row['review_moment'] ?? '-'); ?>
+                                        </td>
+
+                                        <td><?php echo htmlspecialchars($row['creator_email']); ?></td>
+
+                                        <td>
+                                            <div id="view-status-<?php echo $row['id']; ?>" class="view-mode">
+                                                <span class="status-badge <?php echo ($row['status'] === 'open') ? 'bg-open' : 'bg-completed'; ?>">
+                                                    <?php echo ucfirst($row['status']); ?>
+                                                </span>
+                                                <button class="icon-btn" onclick="toggleEdit('status', <?php echo $row['id']; ?>)" title="Bewerken">
+                                                    <span class="material-icons-outlined" style="font-size:14px;">edit</span>
+                                                </button>
+                                            </div>
+                                            
+                                            <form method="POST" id="edit-status-<?php echo $row['id']; ?>" class="edit-mode">
+                                                <input type="hidden" name="form_id" value="<?php echo $row['id']; ?>">
+                                                <input type="hidden" name="update_status" value="1">
+                                                <select name="new_status" class="inline-select">
+                                                    <option value="open" <?php if($row['status'] === 'open') echo 'selected'; ?>>Open</option>
+                                                    <option value="completed" <?php if($row['status'] === 'completed') echo 'selected'; ?>>Completed</option>
+                                                </select>
+                                                <button type="submit" class="icon-btn save" title="Opslaan"><span class="material-icons-outlined">check</span></button>
+                                                <button type="button" class="icon-btn cancel" title="Annuleren" onclick="toggleEdit('status', <?php echo $row['id']; ?>)"><span class="material-icons-outlined">close</span></button>
+                                            </form>
+                                        </td>
+                                        
+                                        <td>
+                                            <div id="view-assign-<?php echo $row['id']; ?>" class="view-mode">
+                                                <?php 
+                                                    if (!empty($row['assigned_to_user_id'])) {
+                                                        $displayName = (!empty($row['assigned_first']) || !empty($row['assigned_last'])) 
+                                                            ? trim($row['assigned_first'] . ' ' . $row['assigned_last']) 
+                                                            : $row['assigned_email'];
+                                                    } else {
+                                                        $displayName = '<span style="color:#bbb; font-style:italic;">-- Niet toegewezen --</span>';
+                                                    }
+                                                    echo $displayName;
+                                                ?>
+                                                <button class="icon-btn" onclick="toggleEdit('assign', <?php echo $row['id']; ?>)" title="Bewerken">
+                                                    <span class="material-icons-outlined" style="font-size:14px;">edit</span>
+                                                </button>
+                                            </div>
+
+                                            <form method="POST" id="edit-assign-<?php echo $row['id']; ?>" class="edit-mode">
+                                                <input type="hidden" name="form_id" value="<?php echo $row['id']; ?>">
+                                                <select name="assign_user_id" class="inline-select">
+                                                    <option value="">-- Geen --</option>
+                                                    <?php foreach ($teamleads as $lead): 
+                                                        $optName = (!empty($lead['first_name']) || !empty($lead['last_name'])) 
+                                                            ? trim($lead['first_name'] . ' ' . $lead['last_name']) 
+                                                            : $lead['email'];
+                                                    ?>
+                                                        <option value="<?php echo $lead['id']; ?>" <?php if($row['assigned_to_user_id'] == $lead['id']) echo 'selected'; ?>>
+                                                            <?php echo htmlspecialchars($optName); ?>
+                                                        </option>
+                                                    <?php endforeach; ?>
+                                                </select>
+                                                <button type="submit" class="icon-btn save" title="Opslaan"><span class="material-icons-outlined">check</span></button>
+                                                <button type="button" class="icon-btn cancel" title="Annuleren" onclick="toggleEdit('assign', <?php echo $row['id']; ?>)"><span class="material-icons-outlined">close</span></button>
+                                            </form>
+                                        </td>
+
+                                        <td style="text-align:right;">
+                                            <a href="feedback_view.php?id=<?php echo $row['id']; ?>" style="color:#999;"><span class="material-icons-outlined">visibility</span></a>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
                         </tbody>
                     </table>
                 </div>
+
+                <?php if ($totalPages > 1): ?>
+                <div class="pagination">
+                    <?php if ($page > 1): ?>
+                        <a href="?page=<?php echo $page - 1; ?>">&laquo; Vorige</a>
+                    <?php else: ?>
+                        <a href="#" class="disabled">&laquo; Vorige</a>
+                    <?php endif; ?>
+
+                    <span class="current">Pagina <?php echo $page; ?> van <?php echo $totalPages; ?></span>
+
+                    <?php if ($page < $totalPages): ?>
+                        <a href="?page=<?php echo $page + 1; ?>">Volgende &raquo;</a>
+                    <?php else: ?>
+                        <a href="#" class="disabled">Volgende &raquo;</a>
+                    <?php endif; ?>
+                </div>
+                <?php endif; ?>
             </div>
         </div>
 
@@ -394,20 +461,29 @@ $recentActivities = $pdo->query("SELECT
                     .then(r => r.json())
                     .then(data => {
                         resultsDiv.innerHTML = '';
-                        if(data.length===0) resultsDiv.innerHTML='<div style="padding:15px; color:#999; text-align:center;">Geen resultaten gevonden</div>';
-                        data.forEach(item => {
-                            const d = document.createElement('div');
-                            d.className='result-item';
-                            d.innerHTML=`
-                                <div>
-                                    <div style="font-weight:600; color:#333;">${item.name}</div>
-                                    <div class="result-sub">${item.employee_id || ''} • ${item.form_date}</div>
-                                </div>
-                                <span class="material-icons-outlined" style="color:#ccc; font-size:18px;">chevron_right</span>
-                            `;
-                            d.onclick = () => window.location.href=`feedback_view.php?id=${item.form_id}`;
-                            resultsDiv.appendChild(d);
-                        });
+                        if(data.error) {
+                             resultsDiv.innerHTML = `<div style="padding:15px; color:red;">Fout: ${data.error}</div>`;
+                        } else if(data.length===0) {
+                             resultsDiv.innerHTML = '<div style="padding:15px; color:#999; text-align:center;">Geen resultaten gevonden</div>';
+                        } else {
+                            data.forEach(item => {
+                                const d = document.createElement('div');
+                                d.className='result-item';
+                                d.innerHTML=`
+                                    <div>
+                                        <div style="font-weight:600; color:#333;">${item.name}</div>
+                                        <div class="result-sub">${item.employee_id || ''} • ${item.form_date}</div>
+                                    </div>
+                                    <span class="material-icons-outlined" style="color:#ccc; font-size:18px;">chevron_right</span>
+                                `;
+                                d.onclick = () => window.location.href=`feedback_view.php?id=${item.form_id}`;
+                                resultsDiv.appendChild(d);
+                            });
+                        }
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        resultsDiv.innerHTML = '<div style="padding:15px; color:red;">Er ging iets mis bij het zoeken.</div>';
                     });
             }, 200);
         });
