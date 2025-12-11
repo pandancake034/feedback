@@ -67,7 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt = $pdo->prepare("UPDATE feedback_forms SET assigned_to_user_id = ? WHERE id = ?");
             $val = !empty($_POST['assign_user_id']) ? $_POST['assign_user_id'] : null;
             $stmt->execute([$val, $_POST['form_id']]);
-            header("Location: dashboard.php?msg=assigned"); exit;
+            header("Location: dashboard.php?msg=Succesvol toegewezen"); exit;
         } catch (PDOException $e) {}
     }
     if (isset($_POST['update_status'], $_POST['form_id'], $_POST['new_status'])) {
