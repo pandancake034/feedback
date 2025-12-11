@@ -206,7 +206,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     <main class="main-content">
         <div class="page-body">
-            <h1 style="margin-top: 0; margin-bottom: 20px;"><?php echo $is_new ? 'Nieuw Gesprek' : 'Gesprek Bewerken'; ?></h1>
+            <h1 style="margin-top: 0; margin-bottom: 20px;"><?php echo $is_new ? 'Nieuw feedbackgesprek' : 'Gesprek Bewerken'; ?></h1>
 
             <?php if ($error): ?>
                 <div style="background: #fde8e8; color: #ea001e; padding: 10px; border-radius: 4px; margin-bottom: 20px; border: 1px solid #fbd5d5;"><?php echo $error; ?></div>
@@ -228,7 +228,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                             </div>
                             
                             <div class="form-group">
-                                <label>Uitzendbureau</label>
+                                <label>Uitzendbureau:</label>
                                 <input type="text" name="agency" list="agency_options" value="<?php echo htmlspecialchars($data['agency']); ?>" placeholder="Typ of kies...">
                                 <datalist id="agency_options">
                                     <option value="Young Capital">
@@ -239,16 +239,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                             </div>
                             
                             <div class="form-group">
-                                <label>Datum Gesprek *</label>
+                                <label>Datum gesprek *</label>
                                 <input type="date" name="form_date" value="<?php echo htmlspecialchars($data['form_date']); ?>" required>
                             </div>
                             <div class="form-group">
-                                <label>Startdatum Periode *</label>
+                                <label>Startdatum Pchauffeur *</label>
                                 <input type="date" name="start_date" value="<?php echo htmlspecialchars($data['start_date']); ?>" required>
                             </div>
 
                             <div class="form-group">
-                                <label>Review Moment</label>
+                                <label>Beoordelingsmoment:</label>
                                 <select name="review_moment">
                                     <option value="">-- Kies --</option>
                                     <option value="8 weken" <?php if($data['review_moment'] == '8 weken') echo 'selected'; ?>>8 weken</option>
@@ -266,29 +266,29 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     <div class="card-body">
                         <div class="form-grid">
                             <div class="form-group">
-                                <label>OTD Score</label>
+                                <label>OTD score:</label>
                                 <input type="text" name="otd_score" id="otd_score" value="<?php echo htmlspecialchars($data['otd_score']); ?>" placeholder="98%">
                             </div>
                             <div class="form-group">
-                                <label>FTR Score</label>
+                                <label>FTR score:</label>
                                 <input type="text" name="ftr_score" id="ftr_score" value="<?php echo htmlspecialchars($data['ftr_score']); ?>" placeholder="99.5%">
                             </div>
                             <div class="form-group">
-                                <label>KW Score</label>
+                                <label>KW verbruik E-vito:</label>
                                 <input type="text" name="kw_score" value="<?php echo htmlspecialchars($data['kw_score']); ?>">
                             </div>
                             <div class="form-group">
-                                <label>Aantal Routes</label>
+                                <label>Aantal routes:</label>
                                 <input type="number" name="routes_count" value="<?php echo htmlspecialchars($data['routes_count']); ?>">
                             </div>
                         </div>
                         <div class="form-grid" style="margin-top: 15px;">
                             <div class="form-group">
-                                <label>Fouten (Errors)</label>
+                                <label>Fouten (errors):</label>
                                 <textarea name="errors_text"><?php echo htmlspecialchars($data['errors_text']); ?></textarea>
                             </div>
                             <div class="form-group">
-                                <label>Te Laat (Late)</label>
+                                <label>Te laat:</label>
                                 <textarea name="late_text"><?php echo htmlspecialchars($data['late_text']); ?></textarea>
                             </div>
                         </div>
@@ -316,7 +316,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                 <select name="skills_rating">
                                     <option value="0">-- Kies --</option>
                                     <?php for($i=1;$i<=5;$i++): ?>
-                                        <option value="<?php echo $i; ?>" <?php if($data['skills_rating']==$i) echo 'selected'; ?>><?php echo $i; ?> Sterren</option>
+                                        <option value="<?php echo $i; ?>" <?php if($data['skills_rating']==$i) echo 'selected'; ?>><?php echo $i; ?></option>
                                     <?php endfor; ?>
                                 </select>
                             </div>
@@ -325,7 +325,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                 <select name="proficiency_rating">
                                     <option value="0">-- Kies --</option>
                                     <?php for($i=1;$i<=14;$i++): ?>
-                                        <option value="<?php echo $i; ?>" <?php if($data['proficiency_rating']==$i) echo 'selected'; ?>><?php echo $i; ?> niveau</option>
+                                        <option value="<?php echo $i; ?>" <?php if($data['proficiency_rating']==$i) echo 'selected'; ?>><?php echo $i; ?></option>
                                     <?php endfor; ?>
                                 </select>
                             </div>
