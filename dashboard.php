@@ -94,58 +94,67 @@ try {
 $teamleads = $pdo->query("SELECT id, email, first_name, last_name FROM users ORDER BY first_name ASC")->fetchAll();
 
 // --- PAGINERING LOGICA (OFFSET BASED) ---
+// --- PAGINERING LOGICA (OFFSET BASED) ---
 $limit = 8;
 $page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int)$_GET['page'] : 1;
 if ($page < 1) $page = 1;
 
-// Query opbouw
-$sqlBase = "SELECT 
+// 1. QUERY OPBOUW - DEEL 1: De velden die we willen zien
+$sqlFields = "SELECT 
             f.id, f.form_date, f.review_moment, f.status, f.assigned_to_user_id, f.created_at,
             d.name as driver_name, d.employee_id,
             u_creator.email as creator_email, 
             u_assigned.email as assigned_email,
             u_assigned.first_name as assigned_first,
-            u_assigned.last_name as assigned_last
-        FROM feedback_forms f
-        JOIN drivers d ON f.driver_id = d.id
-        JOIN users u_creator ON f.created_by_user_id = u_creator.id
-        LEFT JOIN users u_assigned ON f.assigned_to_user_id = u_assigned.id
-        WHERE 1=1";
+            u_assigned.last_name as assigned_last";
+
+// 2. QUERY OPBOUW - DEEL 2: De bron en filters (Body)
+// Dit deel gebruiken we voor ZOWEL de data als de telling.
+$sqlBody = " FROM feedback_forms f
+             JOIN drivers d ON f.driver_id = d.id
+             JOIN users u_creator ON f.created_by_user_id = u_creator.id
+             LEFT JOIN users u_assigned ON f.assigned_to_user_id = u_assigned.id
+             WHERE 1=1";
 
 $params = [];
 
+// Filters toepassen op de body
 if ($filterStatus !== '') {
-    $sqlBase .= " AND f.status = :status";
+    $sqlBody .= " AND f.status = :status";
     $params[':status'] = $filterStatus;
 }
 if ($filterAssigned === 'me') {
-    $sqlBase .= " AND f.assigned_to_user_id = :my_id";
+    $sqlBody .= " AND f.assigned_to_user_id = :my_id";
     $params[':my_id'] = $currentUserId;
 }
 
-// 1. Tellen voor paginering
-$countSql = str_replace(
-    "SELECT \n            f.id, f.form_date, f.review_moment, f.status, f.assigned_to_user_id, f.created_at,\n            d.name as driver_name, d.employee_id,\n            u_creator.email as creator_email, \n            u_assigned.email as assigned_email,\n            u_assigned.first_name as assigned_first,\n            u_assigned.last_name as assigned_last", 
-    "SELECT COUNT(*)", 
-    $sqlBase
-);
-
+// 3. TELLEN (COUNT QUERY)
+// We plakken "SELECT COUNT(*)" voor de body om het totaal te weten
+$countSql = "SELECT COUNT(*) " . $sqlBody;
 $stmtCount = $pdo->prepare($countSql);
 $stmtCount->execute($params);
 $totalRows = $stmtCount->fetchColumn();
+
+// Pagina berekening
 $totalPages = ceil($totalRows / $limit);
 
-// Correctie als pagina te hoog is
+// Correctie als pagina nummer te hoog is
 if ($page > $totalPages && $totalPages > 0) { $page = $totalPages; }
 $offset = ($page - 1) * $limit;
 
-// 2. Data ophalen
-$sqlBase .= " ORDER BY f.created_at DESC LIMIT :limit OFFSET :offset";
-$stmt = $pdo->prepare($sqlBase);
+// 4. DATA OPHALEN
+// We plakken de velden voor de body, en voegen sortering/limit toe
+$sqlFinal = $sqlFields . $sqlBody . " ORDER BY f.created_at DESC LIMIT :limit OFFSET :offset";
 
-foreach ($params as $k => $v) { $stmt->bindValue($k, $v); }
+$stmt = $pdo->prepare($sqlFinal);
+
+// Parameters binden
+foreach ($params as $k => $v) { 
+    $stmt->bindValue($k, $v); 
+}
 $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
 $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+
 $stmt->execute();
 $recentActivities = $stmt->fetchAll();
 
