@@ -1,8 +1,7 @@
 <?php
 /**
  * ADMIN/INDEX.PHP
- * Beheer gebruikers (CRUD) & Bekijk statistieken.
- * UPDATE: Nu met Voornaam & Achternaam
+ * Versie 2.0: Tabbladen structuur & Dossierbeheer
  */
 
 require_once __DIR__ . '/../config/config.php';
@@ -21,6 +20,7 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
 
 $msg = "";
 $error = "";
+$activeTab = $_GET['tab'] ?? 'users'; // Standaard tabblad
 
 // 2. LOGICA: CRUD ACTIES (POST)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -33,14 +33,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt = $pdo->prepare("INSERT INTO users (first_name, last_name, email, password, role) VALUES (?, ?, ?, ?, ?)");
             $hash = password_hash($_POST['password'], PASSWORD_DEFAULT);
             $role = $_POST['role'] ?? 'user';
-            
-            // Nieuwe velden ophalen (mogen leeg zijn, maar we slaan ze wel op)
             $firstName = trim($_POST['first_name'] ?? '');
             $lastName = trim($_POST['last_name'] ?? '');
             
             $stmt->execute([$firstName, $lastName, $_POST['email'], $hash, $role]);
-            header("Location: index.php?msg=created"); exit;
-        } catch (Exception $e) { $error = $e->getMessage(); }
+            header("Location: index.php?msg=created&tab=users"); exit;
+        } catch (Exception $e) { $error = $e->getMessage(); $activeTab = 'users'; }
     }
 
     // B. GEBRUIKER BEWERKEN
@@ -52,7 +50,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $firstName = trim($_POST['first_name'] ?? '');
             $lastName = trim($_POST['last_name'] ?? '');
             
-            // Als wachtwoord veld leeg is, updaten we die niet
             if (!empty($_POST['password'])) {
                 $hash = password_hash($_POST['password'], PASSWORD_DEFAULT);
                 $stmt = $pdo->prepare("UPDATE users SET first_name = ?, last_name = ?, email = ?, role = ?, password = ? WHERE id = ?");
@@ -61,28 +58,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt = $pdo->prepare("UPDATE users SET first_name = ?, last_name = ?, email = ?, role = ? WHERE id = ?");
                 $stmt->execute([$firstName, $lastName, $email, $role, $id]);
             }
-            header("Location: index.php?msg=updated"); exit;
-        } catch (Exception $e) { $error = $e->getMessage(); }
+            header("Location: index.php?msg=updated&tab=users"); exit;
+        } catch (Exception $e) { $error = $e->getMessage(); $activeTab = 'users'; }
     }
 
     // C. GEBRUIKER VERWIJDEREN
     if (isset($_POST['action']) && $_POST['action'] === 'delete') {
         try {
-            // Voorkom dat je jezelf verwijdert
-            if ($_POST['user_id'] == $_SESSION['user_id']) {
-                throw new Exception("Je kunt je eigen account niet verwijderen.");
-            }
+            if ($_POST['user_id'] == $_SESSION['user_id']) throw new Exception("Je kunt je eigen account niet verwijderen.");
+            
             $stmt = $pdo->prepare("DELETE FROM users WHERE id = ?");
             $stmt->execute([$_POST['user_id']]);
-            header("Location: index.php?msg=deleted"); exit;
-        } catch (Exception $e) { $error = $e->getMessage(); }
+            header("Location: index.php?msg=deleted&tab=users"); exit;
+        } catch (Exception $e) { $error = $e->getMessage(); $activeTab = 'users'; }
+    }
+
+    // D. DOSSIER VERWIJDEREN (NIEUW)
+    if (isset($_POST['action']) && $_POST['action'] === 'delete_form') {
+        try {
+            $stmt = $pdo->prepare("DELETE FROM feedback_forms WHERE id = ?");
+            $stmt->execute([$_POST['form_id']]);
+            header("Location: index.php?msg=form_deleted&tab=dossiers"); exit;
+        } catch (Exception $e) { $error = $e->getMessage(); $activeTab = 'dossiers'; }
     }
 }
 
 // 3. DATA OPHALEN
 
-// A. Statistieken: Aantal toegewezen gesprekken per gebruiker
-// We gebruiken een LEFT JOIN om ook users te tonen die 0 gesprekken hebben
+// A. Statistieken
 $statsQuery = "SELECT u.id, u.first_name, u.last_name, u.email, COUNT(f.id) as assigned_count 
                FROM users u 
                LEFT JOIN feedback_forms f ON u.id = f.assigned_to_user_id 
@@ -90,14 +93,22 @@ $statsQuery = "SELECT u.id, u.first_name, u.last_name, u.email, COUNT(f.id) as a
                ORDER BY assigned_count DESC";
 $userStats = $pdo->query($statsQuery)->fetchAll();
 
-// B. Lijst met alle gebruikers
+// B. Gebruikers
 $users = $pdo->query("SELECT * FROM users ORDER BY created_at DESC")->fetchAll();
 
-// Meldingen afvangen
+// C. Alle Dossiers (voor het dossier tabblad)
+$forms = $pdo->query("SELECT f.id, f.form_date, f.status, d.name as driver_name, d.employee_id, u.email as creator_email 
+                      FROM feedback_forms f 
+                      JOIN drivers d ON f.driver_id = d.id 
+                      LEFT JOIN users u ON f.created_by_user_id = u.id 
+                      ORDER BY f.created_at DESC")->fetchAll();
+
+// Meldingen
 if (isset($_GET['msg'])) {
-    if ($_GET['msg'] == 'created') $msg = "Gebruiker succesvol aangemaakt.";
-    if ($_GET['msg'] == 'updated') $msg = "Gebruiker succesvol gewijzigd.";
+    if ($_GET['msg'] == 'created') $msg = "Gebruiker aangemaakt.";
+    if ($_GET['msg'] == 'updated') $msg = "Gebruiker gewijzigd.";
     if ($_GET['msg'] == 'deleted') $msg = "Gebruiker verwijderd.";
+    if ($_GET['msg'] == 'form_deleted') $msg = "Dossier definitief verwijderd.";
 }
 ?>
 <!DOCTYPE html>
@@ -109,7 +120,7 @@ if (isset($_GET['msg'])) {
     <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;600;700&display=swap" rel="stylesheet">
 
     <style>
-        /* --- ENTERPRISE THEME (Kopie van Dashboard) --- */
+        /* --- ENTERPRISE THEME --- */
         :root {
             --brand-color: #0176d3; --brand-dark: #014486;
             --sidebar-bg: #1a2233; --bg-body: #f3f2f2;
@@ -125,7 +136,7 @@ if (isset($_GET['msg'])) {
         /* Sidebar & Layout */
         .sidebar { width: 240px; background-color: var(--sidebar-bg); color: white; display: flex; flex-direction: column; flex-shrink: 0; }
         .sidebar-header { height: 60px; display: flex; align-items: center; padding: 0 20px; border-bottom: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.2); }
-        .sidebar-logo { max-height: 40px; width: auto; display: block; }
+        .sidebar-logo { max-height: 40px; width: auto; }
         .nav-list { list-style: none; padding: 20px 0; margin: 0; flex-grow: 1; }
         .nav-item a { display: flex; align-items: center; padding: 12px 20px; color: #b0b6c3; text-decoration: none; transition: 0.2s; font-size: 14px; }
         .nav-item a:hover, .nav-item a.active { background-color: rgba(255,255,255,0.1); color: white; border-left: 4px solid var(--brand-color); }
@@ -134,6 +145,16 @@ if (isset($_GET['msg'])) {
         .main-content { flex-grow: 1; display: flex; flex-direction: column; overflow-y: auto; }
         .top-header { height: 60px; background: white; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: flex-end; padding: 0 24px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
         .page-body { padding: 24px; max-width: 1400px; margin: 0 auto; width: 100%; flex-grow: 1; }
+
+        /* Tabs Styles */
+        .tab-nav { display: flex; border-bottom: 1px solid var(--border-color); margin-bottom: 24px; background: white; border-radius: 4px 4px 0 0; }
+        .tab-btn { padding: 16px 24px; border: none; background: none; border-bottom: 3px solid transparent; cursor: pointer; font-size: 14px; font-weight: 600; color: var(--text-secondary); transition: 0.2s; }
+        .tab-btn:hover { background: #f9f9f9; color: var(--brand-color); }
+        .tab-btn.active { border-bottom-color: var(--brand-color); color: var(--brand-color); }
+        
+        .tab-content { display: none; animation: fadeIn 0.2s ease-out; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
         /* Cards & Grid */
         .grid-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
@@ -160,17 +181,15 @@ if (isset($_GET['msg'])) {
         .badge-admin { background: #e0e7ff; color: #3730a3; }
         .badge-user { background: #f3f4f6; color: #374151; }
 
-        /* MODAL STYLES */
+        /* Modal */
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; display: none; align-items: center; justify-content: center; backdrop-filter: blur(2px); }
-        .modal { background: white; width: 100%; max-width: 500px; border-radius: 6px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); overflow: hidden; animation: slideUp 0.2s ease-out; }
-        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .modal { background: white; width: 100%; max-width: 500px; border-radius: 6px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
         .modal-header { padding: 16px 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; font-weight: 700; background: #f8f9fa; }
         .modal-body { padding: 20px; }
         .form-group { margin-bottom: 16px; }
         .form-group label { display: block; margin-bottom: 6px; font-size: 13px; font-weight: 600; color: var(--text-secondary); }
         .form-control { width: 100%; padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 14px; }
         .modal-footer { padding: 16px 20px; background: #f8f9fa; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 10px; }
-        
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
     </style>
 </head>
@@ -205,14 +224,9 @@ if (isset($_GET['msg'])) {
 
         <div class="page-body">
             
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
-                <div>
-                    <h1 style="margin: 0; font-size: 24px;">Gebruikersbeheer</h1>
-                    <div style="color: var(--text-secondary); font-size: 13px;">Beheer toegang en bekijk statistieken</div>
-                </div>
-                <button onclick="openModal('create')" class="btn btn-brand">
-                    <span class="material-icons-outlined">add</span> Nieuwe Gebruiker
-                </button>
+            <div style="margin-bottom: 24px;">
+                <h1 style="margin: 0; font-size: 24px;">Systeembeheer</h1>
+                <div style="color: var(--text-secondary); font-size: 13px;">Beheer gebruikers, bekijk statistieken en schoon dossiers op.</div>
             </div>
 
             <?php if ($msg): ?>
@@ -226,71 +240,140 @@ if (isset($_GET['msg'])) {
                 </div>
             <?php endif; ?>
 
-            <div class="grid-row">
-                <?php foreach($userStats as $stat): ?>
-                <div class="card">
-                    <div class="card-body">
-                        <div class="stat-number"><?php echo $stat['assigned_count']; ?></div>
-                        <div class="stat-label">Gesprekken</div>
-                        <div style="font-size:13px; margin-top:4px; font-weight:600;">
-                            <?php 
-                                // Toon naam indien beschikbaar, anders email
-                                $displayName = (!empty($stat['first_name']) || !empty($stat['last_name'])) 
-                                    ? $stat['first_name'] . ' ' . $stat['last_name'] 
-                                    : $stat['email'];
-                                echo htmlspecialchars($displayName); 
-                            ?>
-                        </div>
-                    </div>
-                </div>
-                <?php endforeach; ?>
+            <div class="tab-nav">
+                <button class="tab-btn <?php echo ($activeTab === 'users') ? 'active' : ''; ?>" onclick="openTab('users')">
+                    <span class="material-icons-outlined" style="vertical-align:middle; font-size:18px; margin-right:6px;">people</span>
+                    Gebruikers
+                </button>
+                <button class="tab-btn <?php echo ($activeTab === 'dossiers') ? 'active' : ''; ?>" onclick="openTab('dossiers')">
+                    <span class="material-icons-outlined" style="vertical-align:middle; font-size:18px; margin-right:6px;">folder_delete</span>
+                    Dossiers & Opruimen
+                </button>
+                <button class="tab-btn <?php echo ($activeTab === 'stats') ? 'active' : ''; ?>" onclick="openTab('stats')">
+                    <span class="material-icons-outlined" style="vertical-align:middle; font-size:18px; margin-right:6px;">insights</span>
+                    Statistieken
+                </button>
             </div>
 
-            <div class="card">
-                <div class="card-header">Systeem Gebruikers</div>
-                <div style="overflow-x: auto;">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Naam</th>
-                                <th>E-mailadres</th>
-                                <th>Rol</th>
-                                <th>Laatst Ingelogd</th>
-                                <th style="text-align: right;">Acties</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($users as $user): ?>
-                            <tr>
-                                <td>
-                                    <strong><?php echo htmlspecialchars($user['first_name'] . ' ' . $user['last_name']); ?></strong>
-                                </td>
-                                <td><?php echo htmlspecialchars($user['email']); ?></td>
-                                <td>
-                                    <span class="badge <?php echo ($user['role'] === 'admin') ? 'badge-admin' : 'badge-user'; ?>">
-                                        <?php echo htmlspecialchars($user['role']); ?>
-                                    </span>
-                                </td>
-                                <td><?php echo $user['last_login'] ? date('d-m-Y H:i', strtotime($user['last_login'])) : '-'; ?></td>
-                                <td style="text-align: right;">
-                                    <button class="btn-icon" title="Bewerken" onclick='openModal("edit", <?php echo json_encode($user); ?>)'>
-                                        <span class="material-icons-outlined" style="font-size:18px;">edit</span>
-                                    </button>
-                                    
-                                    <?php if($user['id'] != $_SESSION['user_id']): ?>
-                                    <form method="POST" style="display:inline;" onsubmit="return confirm('Weet je zeker dat je deze gebruiker wilt verwijderen?');">
-                                        <input type="hidden" name="action" value="delete">
-                                        <input type="hidden" name="user_id" value="<?php echo $user['id']; ?>">
-                                        <button type="submit" class="btn-icon delete" title="Verwijderen">
-                                            <span class="material-icons-outlined" style="font-size:18px;">delete</span>
+            <div id="tab-users" class="tab-content <?php echo ($activeTab === 'users') ? 'active' : ''; ?>">
+                <div class="card">
+                    <div class="card-header">
+                        <span>Alle Gebruikers</span>
+                        <button onclick="openModal('create')" class="btn btn-brand">
+                            <span class="material-icons-outlined" style="font-size:16px;">add</span> Nieuw
+                        </button>
+                    </div>
+                    <div style="overflow-x: auto;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Naam</th>
+                                    <th>E-mailadres</th>
+                                    <th>Rol</th>
+                                    <th>Laatst Ingelogd</th>
+                                    <th style="text-align: right;">Acties</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($users as $user): ?>
+                                <tr>
+                                    <td>
+                                        <strong><?php echo htmlspecialchars($user['first_name'] . ' ' . $user['last_name']); ?></strong>
+                                    </td>
+                                    <td><?php echo htmlspecialchars($user['email']); ?></td>
+                                    <td>
+                                        <span class="badge <?php echo ($user['role'] === 'admin') ? 'badge-admin' : 'badge-user'; ?>">
+                                            <?php echo htmlspecialchars($user['role']); ?>
+                                        </span>
+                                    </td>
+                                    <td><?php echo $user['last_login'] ? date('d-m-Y H:i', strtotime($user['last_login'])) : '-'; ?></td>
+                                    <td style="text-align: right;">
+                                        <button class="btn-icon" title="Bewerken" onclick='openModal("edit", <?php echo json_encode($user); ?>)'>
+                                            <span class="material-icons-outlined" style="font-size:18px;">edit</span>
                                         </button>
-                                    </form>
-                                    <?php endif; ?>
-                                </td>
-                            </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
+                                        
+                                        <?php if($user['id'] != $_SESSION['user_id']): ?>
+                                        <form method="POST" style="display:inline;" onsubmit="return confirm('Weet je zeker dat je deze gebruiker wilt verwijderen?');">
+                                            <input type="hidden" name="action" value="delete">
+                                            <input type="hidden" name="user_id" value="<?php echo $user['id']; ?>">
+                                            <button type="submit" class="btn-icon delete" title="Verwijderen">
+                                                <span class="material-icons-outlined" style="font-size:18px;">delete</span>
+                                            </button>
+                                        </form>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div id="tab-dossiers" class="tab-content <?php echo ($activeTab === 'dossiers') ? 'active' : ''; ?>">
+                <div class="card">
+                    <div class="card-header">
+                        Alle Dossiers (Definitief Verwijderen)
+                    </div>
+                    <div style="overflow-x: auto;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Datum</th>
+                                    <th>Chauffeur</th>
+                                    <th>Personeelsnr</th>
+                                    <th>Status</th>
+                                    <th>Gemaakt door</th>
+                                    <th style="text-align: right;">Actie</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($forms as $form): ?>
+                                <tr>
+                                    <td><?php echo date('d-m-Y', strtotime($form['form_date'])); ?></td>
+                                    <td><strong><?php echo htmlspecialchars($form['driver_name']); ?></strong></td>
+                                    <td><?php echo htmlspecialchars($form['employee_id']); ?></td>
+                                    <td>
+                                        <span class="badge" style="background:<?php echo $form['status']=='completed'?'#d1fae5':'#fffbeb'; ?>; color:<?php echo $form['status']=='completed'?'#065f46':'#b45309'; ?>">
+                                            <?php echo ucfirst($form['status']); ?>
+                                        </span>
+                                    </td>
+                                    <td><?php echo htmlspecialchars($form['creator_email']); ?></td>
+                                    <td style="text-align: right;">
+                                        <form method="POST" style="display:inline;" onsubmit="return confirm('PAS OP: Dit verwijdert het dossier definitief. Dit kan niet ongedaan worden gemaakt. Doorgaan?');">
+                                            <input type="hidden" name="action" value="delete_form">
+                                            <input type="hidden" name="form_id" value="<?php echo $form['id']; ?>">
+                                            <button type="submit" class="btn-icon delete" title="Definitief Verwijderen">
+                                                <span class="material-icons-outlined" style="font-size:18px;">delete_forever</span>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div id="tab-stats" class="tab-content <?php echo ($activeTab === 'stats') ? 'active' : ''; ?>">
+                <div class="grid-row">
+                    <?php foreach($userStats as $stat): ?>
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="stat-number"><?php echo $stat['assigned_count']; ?></div>
+                            <div class="stat-label">Gesprekken</div>
+                            <div style="font-size:13px; margin-top:4px; font-weight:600;">
+                                <?php 
+                                    $displayName = (!empty($stat['first_name']) || !empty($stat['last_name'])) 
+                                        ? $stat['first_name'] . ' ' . $stat['last_name'] 
+                                        : $stat['email'];
+                                    echo htmlspecialchars($displayName); 
+                                ?>
+                            </div>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
                 </div>
             </div>
 
@@ -347,6 +430,31 @@ if (isset($_GET['msg'])) {
     </div>
 
     <script>
+        // --- TABS LOGICA ---
+        function openTab(tabName) {
+            // Alle tabs verbergen
+            document.querySelectorAll('.tab-content').forEach(div => div.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            
+            // Gekozen tab tonen
+            document.getElementById('tab-' + tabName).classList.add('active');
+            
+            // Knop highlighten
+            // We zoeken de knop die deze functie aanroept, maar hier simpeler: selecteer op onclick attr
+            const buttons = document.querySelectorAll('.tab-btn');
+            buttons.forEach(btn => {
+                if(btn.getAttribute('onclick').includes(tabName)) {
+                    btn.classList.add('active');
+                }
+            });
+
+            // Update URL zonder reload (optioneel, voor als je refresht)
+            const url = new URL(window.location);
+            url.searchParams.set('tab', tabName);
+            window.history.pushState({}, '', url);
+        }
+
+        // --- MODAL LOGICA ---
         const modal = document.getElementById('userModal');
         const modalTitle = document.getElementById('modalTitle');
         const formAction = document.getElementById('formAction');
@@ -357,7 +465,6 @@ if (isset($_GET['msg'])) {
         const inputEmail = document.getElementById('inputEmail');
         const inputRole = document.getElementById('inputRole');
         const inputPass = document.getElementById('inputPass');
-        
         const passLabel = document.getElementById('passLabel');
         const passHelp = document.getElementById('passHelp');
 
@@ -398,7 +505,6 @@ if (isset($_GET['msg'])) {
             modal.style.display = 'none';
         }
 
-        // Sluit modal bij klik buiten
         window.onclick = function(event) {
             if (event.target == modal) {
                 closeModal();
