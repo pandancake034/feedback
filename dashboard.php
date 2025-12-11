@@ -229,7 +229,7 @@ $recentActivities = $stmt->fetchAll();
         #spotlight-input { border: none; font-size: 16px; width: 100%; outline: none; background: transparent; } /* Font iets kleiner */
         
         #spotlight-results { 
-            max-height: 200px; /* VEEL LAGER: was 350px */
+            max-height: 100px; /* VEEL LAGER: was 350px */
             overflow-y: auto; 
         }
         
