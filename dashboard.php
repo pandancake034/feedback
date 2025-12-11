@@ -1,8 +1,8 @@
 <?php
 /**
  * DASHBOARD.PHP
- * - Update: Terug naar normale paginering (Offset-based).
- * - Feature: AJAX update van tabel behouden (geen page reload).
+ * - Versie: 2.0 (Filters verwijderd, Paginering gefixt)
+ * - Feature: AJAX update van tabel & zoekbalk.
  */
 
 require_once __DIR__ . '/config/config.php';
@@ -56,7 +56,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
 
 include __DIR__ . '/includes/sidebar.php';
 
-// 3. OPSLAAN LOGICA (POST)
+// 3. OPSLAAN LOGICA (POST - INLINE EDITS)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['assign_user_id'], $_POST['form_id'])) {
         try {
@@ -75,13 +75,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// 4. DATA & FILTERS
+// 4. DATA & STATISTIEKEN
 $userEmail = $_SESSION['email'];
 $currentUserId = $_SESSION['user_id'];
 $msg = $_GET['msg'] ?? '';
-
-$filterStatus = $_GET['filter_status'] ?? '';
-$filterAssigned = $_GET['filter_assigned'] ?? '';
 
 // KPI Stats
 $stats = ['drivers' => 0, 'open_feedback' => 0, 'closed_feedback' => 0];
@@ -93,12 +90,32 @@ try {
 
 $teamleads = $pdo->query("SELECT id, email, first_name, last_name FROM users ORDER BY first_name ASC")->fetchAll();
 
-// --- PAGINERING LOGICA (OFFSET BASED) ---
+// --- PAGINERING LOGICA (NIEUWE METHODE) ---
 $limit = 8;
 $page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int)$_GET['page'] : 1;
 if ($page < 1) $page = 1;
 
-// 1. QUERY OPBOUW - DEEL 1: De velden die we willen zien
+// Deel A: De "Body" van de query (zonder SELECT, gebruikt voor zowel tellen als ophalen)
+$sqlBody = " FROM feedback_forms f
+             JOIN drivers d ON f.driver_id = d.id
+             JOIN users u_creator ON f.created_by_user_id = u_creator.id
+             LEFT JOIN users u_assigned ON f.assigned_to_user_id = u_assigned.id";
+
+// Deel B: Tellen hoeveel rijen er in totaal zijn
+try {
+    $stmtCount = $pdo->query("SELECT COUNT(*) " . $sqlBody);
+    $totalRows = $stmtCount->fetchColumn();
+} catch (PDOException $e) {
+    $totalRows = 0;
+}
+
+// Deel C: Pagina berekening
+$totalPages = ceil($totalRows / $limit);
+// Correctie: als pagina 5 wordt gevraagd maar er zijn maar 2 pagina's, ga naar 2.
+if ($page > $totalPages && $totalPages > 0) { $page = $totalPages; }
+$offset = ($page - 1) * $limit;
+
+// Deel D: De daadwerkelijke data ophalen
 $sqlFields = "SELECT 
             f.id, f.form_date, f.review_moment, f.status, f.assigned_to_user_id, f.created_at,
             d.name as driver_name, d.employee_id,
@@ -107,53 +124,11 @@ $sqlFields = "SELECT
             u_assigned.first_name as assigned_first,
             u_assigned.last_name as assigned_last";
 
-// 2. QUERY OPBOUW - DEEL 2: De bron en filters (Body)
-// Dit deel gebruiken we voor ZOWEL de data als de telling.
-$sqlBody = " FROM feedback_forms f
-             JOIN drivers d ON f.driver_id = d.id
-             JOIN users u_creator ON f.created_by_user_id = u_creator.id
-             LEFT JOIN users u_assigned ON f.assigned_to_user_id = u_assigned.id
-             WHERE 1=1";
-
-$params = [];
-
-// Filters toepassen op de body
-if ($filterStatus !== '') {
-    $sqlBody .= " AND f.status = :status";
-    $params[':status'] = $filterStatus;
-}
-if ($filterAssigned === 'me') {
-    $sqlBody .= " AND f.assigned_to_user_id = :my_id";
-    $params[':my_id'] = $currentUserId;
-}
-
-// 3. TELLEN (COUNT QUERY)
-// We plakken "SELECT COUNT(*)" voor de body om het totaal te weten
-$countSql = "SELECT COUNT(*) " . $sqlBody;
-$stmtCount = $pdo->prepare($countSql);
-$stmtCount->execute($params);
-$totalRows = $stmtCount->fetchColumn();
-
-// Pagina berekening
-$totalPages = ceil($totalRows / $limit);
-
-// Correctie als pagina nummer te hoog is
-if ($page > $totalPages && $totalPages > 0) { $page = $totalPages; }
-$offset = ($page - 1) * $limit;
-
-// 4. DATA OPHALEN
-// We plakken de velden voor de body, en voegen sortering/limit toe
 $sqlFinal = $sqlFields . $sqlBody . " ORDER BY f.created_at DESC LIMIT :limit OFFSET :offset";
 
 $stmt = $pdo->prepare($sqlFinal);
-
-// Parameters binden
-foreach ($params as $k => $v) { 
-    $stmt->bindValue($k, $v); 
-}
 $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
 $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
-
 $stmt->execute();
 $recentActivities = $stmt->fetchAll();
 
@@ -164,7 +139,7 @@ $recentActivities = $stmt->fetchAll();
 ob_start();
 if (empty($recentActivities)): ?>
     <tr>
-        <td colspan="7" style="text-align: center; padding: 20px; color: #999;">Geen dossiers gevonden met deze filters.</td>
+        <td colspan="7" style="text-align: center; padding: 20px; color: #999;">Nog geen dossiers aangemaakt.</td>
     </tr>
 <?php else: 
     foreach ($recentActivities as $row): 
@@ -248,8 +223,8 @@ $rowsHtml = ob_get_clean();
 
 // B. Pagination Controls HTML
 ob_start();
-$qs = $_GET; // Kopieer huidige query parameters
-unset($qs['ajax_pagination']); // Verwijder technische parameter
+$qs = $_GET; 
+unset($qs['ajax_pagination']); 
 ?>
     <?php if ($page > 1): 
         $qs['page'] = $page - 1;
@@ -317,11 +292,8 @@ if (isset($_GET['ajax_pagination'])) {
         .alert-toast { background: var(--success-bg); color: var(--success-text); padding: 10px 15px; border-radius: 4px; margin-bottom: 20px; border: 1px solid #a7f3d0; display: flex; align-items: center; gap: 10px; font-size: 14px; }
         .btn-brand { background: var(--brand-color); color: white; padding: 8px 16px; border-radius: 4px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
 
-        /* Filters Toolbar */
-        .filter-toolbar { display: flex; gap: 10px; align-items: center; padding: 12px 16px; background: #fcfcfc; border-bottom: 1px solid var(--border-color); }
-        .filter-select { padding: 6px 10px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 13px; color: var(--text-main); }
-        .btn-filter { padding: 6px 12px; background: white; border: 1px solid var(--border-color); border-radius: 4px; cursor: pointer; font-size: 13px; }
-        .btn-filter:hover { background: #f3f2f2; }
+        /* Filters Toolbar (Versimpeld voor header) */
+        .filter-toolbar { padding: 12px 16px; background: #fcfcfc; border-bottom: 1px solid var(--border-color); display:flex; align-items:center; }
 
         /* Table */
         table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -426,20 +398,9 @@ if (isset($_GET['ajax_pagination'])) {
             </div>
 
             <div class="card">
-                <form method="GET" class="filter-toolbar">
-                    <div style="font-weight:700; font-size:14px; margin-right:auto;">Recente Dossiers</div>
-                    
-                    <select name="filter_status" class="filter-select" onchange="this.form.submit()">
-                        <option value="">Status: Alles</option>
-                        <option value="open" <?php if($filterStatus == 'open') echo 'selected'; ?>>Open</option>
-                        <option value="completed" <?php if($filterStatus == 'completed') echo 'selected'; ?>>Afgerond</option>
-                    </select>
-
-                    <select name="filter_assigned" class="filter-select" onchange="this.form.submit()">
-                        <option value="">Toewijzing: Alles</option>
-                        <option value="me" <?php if($filterAssigned == 'me') echo 'selected'; ?>>Aan mij toegewezen</option>
-                    </select>
-                </form>
+                <div class="filter-toolbar">
+                    <div style="font-weight:700; font-size:14px;">Recente Dossiers</div>
+                </div>
 
                 <div style="overflow-x: auto;">
                     <table style="width: 100%;">
@@ -494,7 +455,7 @@ if (isset($_GET['ajax_pagination'])) {
                 const fetchUrl = new URL(url);
                 fetchUrl.searchParams.append('ajax_pagination', '1');
 
-                // Visual feedback (optioneel, bv opacity iets verlagen)
+                // Visual feedback (opacity iets verlagen)
                 const tableBody = document.getElementById('feedback-table-body');
                 tableBody.style.opacity = '0.5';
 
