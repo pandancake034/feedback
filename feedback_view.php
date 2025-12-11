@@ -2,6 +2,7 @@
 /**
  * FEEDBACK_VIEW.PHP
  * Leesweergave van een dossier + Afspraken/Notities systeem.
+ * UPDATE: 'Te Laat' veld toegevoegd onder Prestaties.
  */
 
 require_once __DIR__ . '/config/config.php';
@@ -266,6 +267,10 @@ $page_title = "Dossier Inzien";
                         <div class="detail-row">
                             <div class="label">Fouten / Errors</div>
                             <div class="value"><?php echo nl2br(htmlspecialchars($form['errors_text'] ?: 'Geen bijzonderheden')); ?></div>
+                        </div>
+                        <div class="detail-row">
+                            <div class="label">Te Laat</div>
+                            <div class="value"><?php echo nl2br(htmlspecialchars($form['late_text'] ?: 'Geen bijzonderheden')); ?></div>
                         </div>
                     </div>
                 </div>

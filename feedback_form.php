@@ -221,15 +221,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             <form method="POST">
                 
                 <div class="card">
-                    <h3 class="form-section-title">1. Chauffeur & Planning</h3>
+                    <h3 class="form-section-title">1. Chauffeur & planning</h3>
                     <div class="card-body">
                         <div class="form-grid">
                             <div class="form-group">
-                                <label>Naam Chauffeur *</label>
+                                <label>Naam *</label>
                                 <input type="text" name="driver_name" value="<?php echo htmlspecialchars($data['driver_name']); ?>" required placeholder="Bijv. Jan Jansen">
                             </div>
                             <div class="form-group">
-                                <label>Personeelsnummer *</label>
+                                <label>Chauffeurs ID *</label>
                                 <input type="text" name="employee_id" value="<?php echo htmlspecialchars($data['employee_id']); ?>" required placeholder="Bijv. 12345">
                             </div>
                             <div class="form-group">
@@ -238,11 +238,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                             </div>
                             
                             <div class="form-group">
-                                <label>Datum Gesprek *</label>
+                                <label>Datum gesprek *</label>
                                 <input type="date" name="form_date" value="<?php echo htmlspecialchars($data['form_date']); ?>" required>
                             </div>
                             <div class="form-group">
-                                <label>Startdatum Periode *</label>
+                                <label>Startdatum chauffeur *</label>
                                 <input type="date" name="start_date" value="<?php echo htmlspecialchars($data['start_date']); ?>" required>
                             </div>
 
@@ -250,7 +250,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                 <label>Review Moment</label>
                                 <select name="review_moment">
                                     <option value="">-- Kies --</option>
-                                    <option value="8 weken" <?php if($data['review_moment'] == '8 weken') echo 'selected'; ?>>8 weken</option>
+                                    <option value="8 weken" <?php if($data['review_moment'] == '8 weken') echo 'selected'; ?>>8 ritten (proeftijd)</option>
                                     <option value="26 weken" <?php if($data['review_moment'] == '26 weken') echo 'selected'; ?>>26 weken</option>
                                     <option value="52 weken" <?php if($data['review_moment'] == '52 weken') echo 'selected'; ?>>52 weken</option>
                                 </select>
@@ -265,29 +265,29 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     <div class="card-body">
                         <div class="form-grid">
                             <div class="form-group">
-                                <label>OTD Score</label>
+                                <label>OTD score</label>
                                 <input type="text" name="otd_score" id="otd_score" value="<?php echo htmlspecialchars($data['otd_score']); ?>" placeholder="98%">
                             </div>
                             <div class="form-group">
-                                <label>FTR Score</label>
+                                <label>FTR score</label>
                                 <input type="text" name="ftr_score" id="ftr_score" value="<?php echo htmlspecialchars($data['ftr_score']); ?>" placeholder="99.5%">
                             </div>
                             <div class="form-group">
-                                <label>KW Score</label>
+                                <label>KW verbruik E-vito</label>
                                 <input type="text" name="kw_score" value="<?php echo htmlspecialchars($data['kw_score']); ?>">
                             </div>
                             <div class="form-group">
-                                <label>Aantal Routes</label>
+                                <label>Aantal routes</label>
                                 <input type="number" name="routes_count" value="<?php echo htmlspecialchars($data['routes_count']); ?>">
                             </div>
                         </div>
                         <div class="form-grid" style="margin-top: 15px;">
                             <div class="form-group">
-                                <label>Fouten (Errors)</label>
+                                <label>Fouten (errors)</label>
                                 <textarea name="errors_text"><?php echo htmlspecialchars($data['errors_text']); ?></textarea>
                             </div>
                             <div class="form-group">
-                                <label>Te Laat (Late)</label>
+                                <label>TTe laat:</label>
                                 <textarea name="late_text"><?php echo htmlspecialchars($data['late_text']); ?></textarea>
                             </div>
                         </div>
@@ -298,7 +298,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     <h3 class="form-section-title">3. Gedrag & Beoordeling</h3>
                     <div class="card-body">
                         <div class="form-group">
-                            <label>Rijgedrag & Communicatie</label>
+                            <label>Rijgedrag & communicatie</label>
                             <textarea name="driving_behavior"><?php echo htmlspecialchars($data['driving_behavior']); ?></textarea>
                         </div>
                         <div class="form-group">
@@ -315,7 +315,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                 <select name="skills_rating">
                                     <option value="0">-- Kies --</option>
                                     <?php for($i=1;$i<=5;$i++): ?>
-                                        <option value="<?php echo $i; ?>" <?php if($data['skills_rating']==$i) echo 'selected'; ?>><?php echo $i; ?> Sterren</option>
+                                        <option value="<?php echo $i; ?>" <?php if($data['skills_rating']==$i) echo 'selected'; ?>><?php echo $i; ?> </option>
                                     <?php endfor; ?>
                                 </select>
                             </div>
@@ -324,7 +324,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                 <select name="proficiency_rating">
                                     <option value="0">-- Kies --</option>
                                     <?php for($i=1;$i<=14;$i++): ?>
-                                        <option value="<?php echo $i; ?>" <?php if($data['proficiency_rating']==$i) echo 'selected'; ?>><?php echo $i; ?> niveau</option>
+                                        <option value="<?php echo $i; ?>" <?php if($data['proficiency_rating']==$i) echo 'selected'; ?>><?php echo $i; ?></option>
                                     <?php endfor; ?>
                                 </select>
                             </div>
