@@ -1,7 +1,7 @@
 <?php
 /**
  * DASHBOARD.PHP
- * - Update: Keyset pagination toegevoegd voor snellere navigatie en betere prestaties.
+ * - Fix: SQLSTATE[HY093] opgelost door unieke parameter namen te gebruiken voor keyset pagination.
  */
 
 require_once __DIR__ . '/config/config.php';
@@ -134,24 +134,22 @@ if ($filterAssigned === 'me') {
     $params[':my_id'] = $currentUserId;
 }
 
-// Keyset conditie toevoegen (Haal alles op dat OUDER is dan de cursor)
-// We sorteren op created_at DESC, dus 'volgende' pagina betekent 'kleinere' datum.
-// Bij gelijke datum kijken we naar een lager ID.
+// Keyset conditie toevoegen
 if ($cursorDate && $cursorId) {
-    $sqlBase .= " AND (f.created_at < :c_date OR (f.created_at = :c_date AND f.id < :c_id))";
-    $params[':c_date'] = $cursorDate;
-    $params[':c_id']   = $cursorId;
+    // FIX: Gebruik unieke parameternamen :c_date1 en :c_date2 omdat PDO::ATTR_EMULATE_PREPARES false is.
+    $sqlBase .= " AND (f.created_at < :c_date1 OR (f.created_at = :c_date2 AND f.id < :c_id))";
+    $params[':c_date1'] = $cursorDate;
+    $params[':c_date2'] = $cursorDate; // Dubbel binden voor veiligheid
+    $params[':c_id']    = $cursorId;
 }
 
 // Sortering en Limit
-// Belangrijk: We moeten ook sorteren op ID om de volgorde deterministisch te maken
 $sqlBase .= " ORDER BY f.created_at DESC, f.id DESC LIMIT :limit";
-$params[':limit'] = $fetchLimit; // We vragen er 9 op (int)
+$params[':limit'] = $fetchLimit; 
 
 $stmt = $pdo->prepare($sqlBase);
 // Bind parameters
 foreach ($params as $k => $v) {
-    // Limit moet expliciet als INT, anders doet PDO soms moeilijk bij MySQL LIMIT
     if ($k === ':limit') {
         $stmt->bindValue($k, $v, PDO::PARAM_INT);
     } else {
@@ -164,10 +162,7 @@ $recentActivities = $stmt->fetchAll();
 // Checken voor volgende pagina
 $nextCursor = null;
 if (count($recentActivities) > $limit) {
-    // Er is een volgende pagina, want we hebben meer resultaten dan de limiet
-    array_pop($recentActivities); // Verwijder het 9e item uit de weergave array
-    
-    // Het 8e item (nu het laatste in de array) wordt de cursor voor de volgende pagina
+    array_pop($recentActivities); 
     $lastItem = end($recentActivities);
     $nextCursor = base64_encode($lastItem['created_at'] . '|' . $lastItem['id']);
 }
