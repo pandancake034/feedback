@@ -1,10 +1,4 @@
 <?php
-/**
- * FEEDBACK_FORM.PHP
- * FIXED: Review Moment dropdown toegevoegd & opslaan in database.
- * UPDATE: Automatische % toevoeging bij OTD en FTR scores.
- */
-
 require_once __DIR__ . '/config/config.php';
 require_once __DIR__ . '/config/db.php';
 
@@ -22,7 +16,7 @@ $success = "";
 $data = [
     'driver_name' => '', 
     'employee_id' => '', 
-    'agency' => 'YoungCapital',
+    'agency' => '', // AANGEPAST: Standaard leeg laten
     'form_date' => date('Y-m-d'), 
     'start_date' => date('Y-m-d', strtotime('-1 week')),
     'review_moment' => '',
@@ -212,7 +206,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     <main class="main-content">
         <div class="page-body">
-            <h1 style="margin-top: 0; margin-bottom: 20px;"><?php echo $is_new ? 'Nieuw feedbackgesprek toevoegen' : 'Gesprek Bewerken'; ?></h1>
+            <h1 style="margin-top: 0; margin-bottom: 20px;"><?php echo $is_new ? 'Nieuw Gesprek' : 'Gesprek Bewerken'; ?></h1>
 
             <?php if ($error): ?>
                 <div style="background: #fde8e8; color: #ea001e; padding: 10px; border-radius: 4px; margin-bottom: 20px; border: 1px solid #fbd5d5;"><?php echo $error; ?></div>
@@ -221,28 +215,35 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             <form method="POST">
                 
                 <div class="card">
-                    <h3 class="form-section-title">1. Chauffeur & planning</h3>
+                    <h3 class="form-section-title">1. Chauffeur & Planning</h3>
                     <div class="card-body">
                         <div class="form-grid">
                             <div class="form-group">
-                                <label>Naam *</label>
+                                <label>Naam Chauffeur *</label>
                                 <input type="text" name="driver_name" value="<?php echo htmlspecialchars($data['driver_name']); ?>" required placeholder="Bijv. Jan Jansen">
                             </div>
                             <div class="form-group">
-                                <label>Chauffeurs ID *</label>
+                                <label>Personeelsnummer *</label>
                                 <input type="text" name="employee_id" value="<?php echo htmlspecialchars($data['employee_id']); ?>" required placeholder="Bijv. 12345">
-                            </div>
-                            <div class="form-group">
-                                <label>Uitzendbureau</label>
-                                <input type="text" name="agency" value="<?php echo htmlspecialchars($data['agency']); ?>">
                             </div>
                             
                             <div class="form-group">
-                                <label>Datum gesprek *</label>
+                                <label>Uitzendbureau</label>
+                                <input type="text" name="agency" list="agency_options" value="<?php echo htmlspecialchars($data['agency']); ?>" placeholder="Typ of kies...">
+                                <datalist id="agency_options">
+                                    <option value="Young Capital">
+                                    <option value="LevelWorks">
+                                    <option value="NowJobs">
+                                    <option value="Timing">
+                                </datalist>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>Datum Gesprek *</label>
                                 <input type="date" name="form_date" value="<?php echo htmlspecialchars($data['form_date']); ?>" required>
                             </div>
                             <div class="form-group">
-                                <label>Startdatum chauffeur *</label>
+                                <label>Startdatum Periode *</label>
                                 <input type="date" name="start_date" value="<?php echo htmlspecialchars($data['start_date']); ?>" required>
                             </div>
 
@@ -250,7 +251,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                 <label>Review Moment</label>
                                 <select name="review_moment">
                                     <option value="">-- Kies --</option>
-                                    <option value="8 weken" <?php if($data['review_moment'] == '8 weken') echo 'selected'; ?>>8 ritten (proeftijd)</option>
+                                    <option value="8 weken" <?php if($data['review_moment'] == '8 weken') echo 'selected'; ?>>8 weken</option>
                                     <option value="26 weken" <?php if($data['review_moment'] == '26 weken') echo 'selected'; ?>>26 weken</option>
                                     <option value="52 weken" <?php if($data['review_moment'] == '52 weken') echo 'selected'; ?>>52 weken</option>
                                 </select>
@@ -265,29 +266,29 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     <div class="card-body">
                         <div class="form-grid">
                             <div class="form-group">
-                                <label>OTD score</label>
+                                <label>OTD Score</label>
                                 <input type="text" name="otd_score" id="otd_score" value="<?php echo htmlspecialchars($data['otd_score']); ?>" placeholder="98%">
                             </div>
                             <div class="form-group">
-                                <label>FTR score</label>
+                                <label>FTR Score</label>
                                 <input type="text" name="ftr_score" id="ftr_score" value="<?php echo htmlspecialchars($data['ftr_score']); ?>" placeholder="99.5%">
                             </div>
                             <div class="form-group">
-                                <label>KW verbruik E-vito</label>
+                                <label>KW Score</label>
                                 <input type="text" name="kw_score" value="<?php echo htmlspecialchars($data['kw_score']); ?>">
                             </div>
                             <div class="form-group">
-                                <label>Aantal routes</label>
+                                <label>Aantal Routes</label>
                                 <input type="number" name="routes_count" value="<?php echo htmlspecialchars($data['routes_count']); ?>">
                             </div>
                         </div>
                         <div class="form-grid" style="margin-top: 15px;">
                             <div class="form-group">
-                                <label>Fouten (errors)</label>
+                                <label>Fouten (Errors)</label>
                                 <textarea name="errors_text"><?php echo htmlspecialchars($data['errors_text']); ?></textarea>
                             </div>
                             <div class="form-group">
-                                <label>TTe laat:</label>
+                                <label>Te Laat (Late)</label>
                                 <textarea name="late_text"><?php echo htmlspecialchars($data['late_text']); ?></textarea>
                             </div>
                         </div>
@@ -298,7 +299,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     <h3 class="form-section-title">3. Gedrag & Beoordeling</h3>
                     <div class="card-body">
                         <div class="form-group">
-                            <label>Rijgedrag & communicatie</label>
+                            <label>Rijgedrag & Communicatie</label>
                             <textarea name="driving_behavior"><?php echo htmlspecialchars($data['driving_behavior']); ?></textarea>
                         </div>
                         <div class="form-group">
@@ -315,7 +316,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                 <select name="skills_rating">
                                     <option value="0">-- Kies --</option>
                                     <?php for($i=1;$i<=5;$i++): ?>
-                                        <option value="<?php echo $i; ?>" <?php if($data['skills_rating']==$i) echo 'selected'; ?>><?php echo $i; ?> </option>
+                                        <option value="<?php echo $i; ?>" <?php if($data['skills_rating']==$i) echo 'selected'; ?>><?php echo $i; ?> Sterren</option>
                                     <?php endfor; ?>
                                 </select>
                             </div>
@@ -324,7 +325,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                 <select name="proficiency_rating">
                                     <option value="0">-- Kies --</option>
                                     <?php for($i=1;$i<=14;$i++): ?>
-                                        <option value="<?php echo $i; ?>" <?php if($data['proficiency_rating']==$i) echo 'selected'; ?>><?php echo $i; ?></option>
+                                        <option value="<?php echo $i; ?>" <?php if($data['proficiency_rating']==$i) echo 'selected'; ?>><?php echo $i; ?> niveau</option>
                                     <?php endfor; ?>
                                 </select>
                             </div>
@@ -345,20 +346,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <script>
         function formatPercentage(input) {
             let val = input.value.trim();
-            // Als het veld leeg is, doe niets
             if (val === '') return;
-
-            // Verwijder alle procenttekens die er al staan om schoon te beginnen
-            // en verwijder eventuele dubbele
             val = val.replace(/%/g, '');
-            
-            // Plak er eentje achteraan
             if (val !== '') {
                 input.value = val + '%';
             }
         }
-
-        // Koppel de functie aan de velden
         const otdInput = document.getElementById('otd_score');
         const ftrInput = document.getElementById('ftr_score');
 
