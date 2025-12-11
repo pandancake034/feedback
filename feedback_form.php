@@ -2,6 +2,7 @@
 /**
  * FEEDBACK_FORM.PHP
  * FIXED: Review Moment dropdown toegevoegd & opslaan in database.
+ * UPDATE: Automatische % toevoeging bij OTD en FTR scores.
  */
 
 require_once __DIR__ . '/config/config.php';
@@ -24,7 +25,7 @@ $data = [
     'agency' => 'YoungCapital',
     'form_date' => date('Y-m-d'), 
     'start_date' => date('Y-m-d', strtotime('-1 week')),
-    'review_moment' => '', // NIEUW VELD
+    'review_moment' => '',
     'otd_score' => '', 
     'ftr_score' => '', 
     'kw_score' => '', 
@@ -92,11 +93,19 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             // Alle velden ophalen
             $form_date       = $_POST['form_date'] ?? date('Y-m-d');
             $start_date      = $_POST['start_date'] ?? date('Y-m-d');
-            $review_moment   = $_POST['review_moment'] ?? ''; // NIEUW
+            $review_moment   = $_POST['review_moment'] ?? '';
             $agency          = $_POST['agency'] ?? '';
             $routes_count    = $_POST['routes_count'] ?? 0;
+            
+            // Zeker weten dat de scores correct worden opgeslagen (met %)
             $otd_score       = $_POST['otd_score'] ?? '';
             $ftr_score       = $_POST['ftr_score'] ?? '';
+            // Verwijder eventuele dubbele % tekens voor de zekerheid aan server-kant
+            $otd_score = str_replace('%', '', $otd_score) . '%';
+            $ftr_score = str_replace('%', '', $ftr_score) . '%';
+            if($otd_score === '%') $otd_score = ''; // Als leeg was, blijft leeg
+            if($ftr_score === '%') $ftr_score = ''; 
+
             $errors_text     = $_POST['errors_text'] ?? '';
             $late_text       = $_POST['late_text'] ?? '';
             $driving_behavior= $_POST['driving_behavior'] ?? '';
@@ -107,7 +116,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $client_compliment  = $_POST['client_compliment'] ?? '';
 
             if ($is_new) {
-                // INSERT (review_moment toegevoegd)
+                // INSERT
                 $sql = "INSERT INTO feedback_forms (
                             driver_id, created_by_user_id, form_date, start_date, review_moment, agency,
                             routes_count, otd_score, ftr_score, errors_text, nokd_text, late_text,
@@ -124,7 +133,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 ]);
                 
             } else {
-                // UPDATE (review_moment toegevoegd)
+                // UPDATE
                 $sql = "UPDATE feedback_forms SET 
                             driver_id = ?, form_date = ?, start_date = ?, review_moment = ?, agency = ?,
                             routes_count = ?, otd_score = ?, ftr_score = ?, errors_text = ?, late_text = ?,
@@ -257,11 +266,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         <div class="form-grid">
                             <div class="form-group">
                                 <label>OTD Score</label>
-                                <input type="text" name="otd_score" value="<?php echo htmlspecialchars($data['otd_score']); ?>" placeholder="98%">
+                                <input type="text" name="otd_score" id="otd_score" value="<?php echo htmlspecialchars($data['otd_score']); ?>" placeholder="98%">
                             </div>
                             <div class="form-group">
                                 <label>FTR Score</label>
-                                <input type="text" name="ftr_score" value="<?php echo htmlspecialchars($data['ftr_score']); ?>" placeholder="99.5%">
+                                <input type="text" name="ftr_score" id="ftr_score" value="<?php echo htmlspecialchars($data['ftr_score']); ?>" placeholder="99.5%">
                             </div>
                             <div class="form-group">
                                 <label>KW Score</label>
@@ -332,6 +341,34 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             </form>
         </div>
     </main>
+    
+    <script>
+        function formatPercentage(input) {
+            let val = input.value.trim();
+            // Als het veld leeg is, doe niets
+            if (val === '') return;
+
+            // Verwijder alle procenttekens die er al staan om schoon te beginnen
+            // en verwijder eventuele dubbele
+            val = val.replace(/%/g, '');
+            
+            // Plak er eentje achteraan
+            if (val !== '') {
+                input.value = val + '%';
+            }
+        }
+
+        // Koppel de functie aan de velden
+        const otdInput = document.getElementById('otd_score');
+        const ftrInput = document.getElementById('ftr_score');
+
+        if (otdInput) {
+            otdInput.addEventListener('blur', function() { formatPercentage(this); });
+        }
+        if (ftrInput) {
+            ftrInput.addEventListener('blur', function() { formatPercentage(this); });
+        }
+    </script>
 
 </body>
 </html>
