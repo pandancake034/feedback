@@ -94,7 +94,6 @@ try {
 $teamleads = $pdo->query("SELECT id, email, first_name, last_name FROM users ORDER BY first_name ASC")->fetchAll();
 
 // --- PAGINERING LOGICA (OFFSET BASED) ---
-// --- PAGINERING LOGICA (OFFSET BASED) ---
 $limit = 8;
 $page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int)$_GET['page'] : 1;
 if ($page < 1) $page = 1;
