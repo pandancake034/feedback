@@ -243,7 +243,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                 <input type="date" name="form_date" value="<?php echo htmlspecialchars($data['form_date']); ?>" required>
                             </div>
                             <div class="form-group">
-                                <label>Startdatum Pchauffeur *</label>
+                                <label>Startdatum chauffeur *</label>
                                 <input type="date" name="start_date" value="<?php echo htmlspecialchars($data['start_date']); ?>" required>
                             </div>
 

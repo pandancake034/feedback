@@ -276,9 +276,9 @@ $recentActivities = $stmt->fetchAll();
             <?php endif; ?>
 
             <div class="grid-row">
-                <div class="card"><div class="card-body"><div class="kpi-value"><?php echo $stats['drivers']; ?></div><div class="kpi-label">Actieve Chauffeurs</div></div></div>
-                <div class="card"><div class="card-body"><div class="kpi-value"><?php echo $stats['open_feedback']; ?></div><div class="kpi-label">Openstaande Dossiers</div></div></div>
-                <div class="card"><div class="card-body"><div class="kpi-value"><?php echo $stats['closed_feedback']; ?></div><div class="kpi-label">Gesloten Dossiers</div></div></div>
+                <div class="card"><div class="card-body"><div class="kpi-value"><?php echo $stats['drivers']; ?></div><div class="kpi-label">Aantal dossiers</div></div></div>
+                <div class="card"><div class="card-body"><div class="kpi-value"><?php echo $stats['open_feedback']; ?></div><div class="kpi-label">Openstaande dossiers</div></div></div>
+                <div class="card"><div class="card-body"><div class="kpi-value"><?php echo $stats['closed_feedback']; ?></div><div class="kpi-label">Gesloten dossiers</div></div></div>
             </div>
 
             <div class="card">
