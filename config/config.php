@@ -43,7 +43,7 @@ loadEnv(__DIR__ . '/../.env');
 // 2. CONSTANTEN DEFINIËREN (Gebruikt door db.php en de rest van de app)
 // We gebruiken ?? '' als fallback voor het geval de .env waarde mist.
 
-define('APP_TITLE', $_ENV['APP_TITLE'] ?? 'LogistiekApp');
+define('APP_TITLE', $_ENV['APP_TITLE'] ?? 'FeedbackFlow');
 define('BASE_URL',  $_ENV['BASE_URL']  ?? 'http://localhost');
 
 define('DB_HOST', $_ENV['DB_HOST'] ?? 'localhost');
