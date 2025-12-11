@@ -206,7 +206,7 @@ $recentActivities = $stmt->fetchAll();
         .header-search-trigger:hover { background: #e0e0e0; }
 
         #search-overlay { 
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            position: fixed; top: 0; left: 0; width: 100%; height: 50%; 
             background: rgba(0,0,0,0.25); /* Donkere, transparante achtergrond ipv vol wit */
             z-index: 9999; display: none; justify-content: center; 
             padding-top: 15vh; /* Iets lager zetten */
