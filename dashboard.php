@@ -1,7 +1,7 @@
 <?php
 /**
  * DASHBOARD.PHP
- * - Versie: 2.0 (Filters verwijderd, Paginering gefixt)
+ * - Versie: 2.1 (Fix voor paginering knoppen die niet reageren)
  * - Feature: AJAX update van tabel & zoekbalk.
  */
 
@@ -16,6 +16,9 @@ if (!isset($_SESSION['user_id'])) {
 
 // --- AJAX HANDLER VOOR LIVE SUGGESTIES (ZOEKBALK) ---
 if (isset($_GET['ajax_search'])) {
+    // Wis output buffers om JSON fouten te voorkomen
+    while (ob_get_level()) { ob_end_clean(); }
+    
     header('Content-Type: application/json');
     $term = trim($_GET['ajax_search']);
     if (strlen($term) < 1) { echo json_encode([]); exit; }
@@ -35,6 +38,7 @@ if (isset($_GET['ajax_search'])) {
 
 // 2. CSV EXPORT LOGICA
 if (isset($_GET['export']) && $_GET['export'] === 'csv') {
+    while (ob_get_level()) { ob_end_clean(); } // Buffer wissen voor schone download
     header('Content-Type: text/csv');
     header('Content-Disposition: attachment; filename="feedback_export_'.date('Y-m-d').'.csv"');
     $output = fopen('php://output', 'w');
@@ -90,18 +94,18 @@ try {
 
 $teamleads = $pdo->query("SELECT id, email, first_name, last_name FROM users ORDER BY first_name ASC")->fetchAll();
 
-// --- PAGINERING LOGICA (NIEUWE METHODE) ---
+// --- PAGINERING LOGICA (ROBUUSTE METHODE) ---
 $limit = 8;
 $page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int)$_GET['page'] : 1;
 if ($page < 1) $page = 1;
 
-// Deel A: De "Body" van de query (zonder SELECT, gebruikt voor zowel tellen als ophalen)
+// Deel A: De "Body" van de query (zonder SELECT)
 $sqlBody = " FROM feedback_forms f
              JOIN drivers d ON f.driver_id = d.id
              JOIN users u_creator ON f.created_by_user_id = u_creator.id
              LEFT JOIN users u_assigned ON f.assigned_to_user_id = u_assigned.id";
 
-// Deel B: Tellen hoeveel rijen er in totaal zijn
+// Deel B: Tellen
 try {
     $stmtCount = $pdo->query("SELECT COUNT(*) " . $sqlBody);
     $totalRows = $stmtCount->fetchColumn();
@@ -111,11 +115,10 @@ try {
 
 // Deel C: Pagina berekening
 $totalPages = ceil($totalRows / $limit);
-// Correctie: als pagina 5 wordt gevraagd maar er zijn maar 2 pagina's, ga naar 2.
 if ($page > $totalPages && $totalPages > 0) { $page = $totalPages; }
 $offset = ($page - 1) * $limit;
 
-// Deel D: De daadwerkelijke data ophalen
+// Deel D: Data ophalen
 $sqlFields = "SELECT 
             f.id, f.form_date, f.review_moment, f.status, f.assigned_to_user_id, f.created_at,
             d.name as driver_name, d.employee_id,
@@ -250,6 +253,9 @@ $paginationHtml = ob_get_clean();
 
 // 3. AJAX REQUEST AFHANDELING
 if (isset($_GET['ajax_pagination'])) {
+    // CRUCIAAL: Buffers wissen om 'white-space injection' uit includes te verwijderen
+    while (ob_get_level()) { ob_end_clean(); }
+    
     header('Content-Type: application/json');
     echo json_encode([
         'rows' => $rowsHtml,
@@ -292,7 +298,7 @@ if (isset($_GET['ajax_pagination'])) {
         .alert-toast { background: var(--success-bg); color: var(--success-text); padding: 10px 15px; border-radius: 4px; margin-bottom: 20px; border: 1px solid #a7f3d0; display: flex; align-items: center; gap: 10px; font-size: 14px; }
         .btn-brand { background: var(--brand-color); color: white; padding: 8px 16px; border-radius: 4px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
 
-        /* Filters Toolbar (Versimpeld voor header) */
+        /* Filters Toolbar */
         .filter-toolbar { padding: 12px 16px; background: #fcfcfc; border-bottom: 1px solid var(--border-color); display:flex; align-items:center; }
 
         /* Table */
@@ -307,7 +313,7 @@ if (isset($_GET['ajax_pagination'])) {
         .pagination .current { color: var(--text-secondary); font-weight: 600; }
         .pagination .disabled { opacity: 0.5; pointer-events: none; color: #999; padding: 6px 12px; border: 1px solid #eee; border-radius: 4px; }
 
-        /* Inline Edit & Badges */
+        /* Inline Edit */
         .view-mode { display: flex; align-items: center; gap: 8px; }
         .edit-mode { display: none; align-items: center; gap: 4px; }
         .icon-btn { cursor: pointer; color: #999; font-size: 16px; transition: color 0.2s; background: none; border: none; padding: 2px; }
@@ -322,20 +328,8 @@ if (isset($_GET['ajax_pagination'])) {
         /* HEADER SEARCH & OVERLAY */
         .header-search-trigger { background: #f3f2f2; border: 1px solid var(--border-color); border-radius: 6px; padding: 8px 12px; width: 280px; color: var(--text-secondary); font-size: 13px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; transition: background 0.2s; }
         .header-search-trigger:hover { background: #e0e0e0; }
-
-        #search-overlay { 
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-            background: rgba(0,0,0,0.25); 
-            z-index: 9999; display: none; justify-content: center; 
-            padding-top: 15vh; 
-        }
-
-        .spotlight-container { 
-            width: 100%; max-width: 400px; background: white; border-radius: 8px; 
-            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.2); overflow: hidden; 
-            border: 1px solid #e5e7eb; display: flex; flex-direction: column; max-height: 80vh; 
-        }
-
+        #search-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.25); z-index: 9999; display: none; justify-content: center; padding-top: 15vh; }
+        .spotlight-container { width: 100%; max-width: 400px; background: white; border-radius: 8px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.2); overflow: hidden; border: 1px solid #e5e7eb; display: flex; flex-direction: column; max-height: 80vh; }
         .spotlight-input-wrapper { display: flex; align-items: center; padding: 12px 16px; border-bottom: 1px solid #eee; }
         #spotlight-input { border: none; font-size: 16px; width: 100%; outline: none; background: transparent; }
         #spotlight-results { max-height: 100px; overflow-y: auto; }
@@ -443,37 +437,39 @@ if (isset($_GET['ajax_pagination'])) {
             }
         }
         
-        // --- PAGINATION AJAX LOGICA ---
+        // --- PAGINATION AJAX LOGICA MET FALLBACK ---
         document.addEventListener('click', function(e) {
-            // Check of er op een link in de pagination div wordt geklikt
             if (e.target.closest('#pagination-container a')) {
-                e.preventDefault();
                 const link = e.target.closest('a');
-                const url = link.href;
-                
-                // Voeg ajax parameter toe
-                const fetchUrl = new URL(url);
-                fetchUrl.searchParams.append('ajax_pagination', '1');
+                // Alleen intercepteren als het een normale klik is (geen ctrl/cmd klik)
+                if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+                    e.preventDefault();
+                    const url = link.href;
+                    
+                    const fetchUrl = new URL(url);
+                    fetchUrl.searchParams.append('ajax_pagination', '1');
 
-                // Visual feedback (opacity iets verlagen)
-                const tableBody = document.getElementById('feedback-table-body');
-                tableBody.style.opacity = '0.5';
+                    const tableBody = document.getElementById('feedback-table-body');
+                    tableBody.style.opacity = '0.5';
 
-                fetch(fetchUrl)
-                    .then(res => res.json())
-                    .then(data => {
-                        // Vervang HTML
-                        tableBody.innerHTML = data.rows;
-                        document.getElementById('pagination-container').innerHTML = data.pagination;
-                        tableBody.style.opacity = '1';
-                        
-                        // Update URL balk zonder refresh
-                        window.history.pushState({}, '', url);
-                    })
-                    .catch(err => {
-                        console.error('Pagination error:', err);
-                        tableBody.style.opacity = '1';
-                    });
+                    fetch(fetchUrl)
+                        .then(res => {
+                            if (!res.ok) throw new Error('Network response was not ok');
+                            return res.json();
+                        })
+                        .then(data => {
+                            // Succes: update de tabel
+                            tableBody.innerHTML = data.rows;
+                            document.getElementById('pagination-container').innerHTML = data.pagination;
+                            tableBody.style.opacity = '1';
+                            window.history.pushState({}, '', url);
+                        })
+                        .catch(err => {
+                            console.warn('AJAX Pagination mislukt, fallback naar normale navigatie.', err);
+                            // FALLBACK: Als AJAX faalt (bijv. door JSON error), volg gewoon de link!
+                            window.location.href = url;
+                        });
+                }
             }
         });
 
