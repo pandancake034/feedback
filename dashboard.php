@@ -74,7 +74,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             $stmt = $pdo->prepare("UPDATE feedback_forms SET status = ? WHERE id = ?");
             $stmt->execute([$_POST['new_status'], $_POST['form_id']]);
-            header("Location: dashboard.php?msg=status_update"); exit;
+            header("Location: dashboard.php?msg=Status succesvol geupdated"); exit;
         } catch (PDOException $e) {}
     }
 }
