@@ -1,7 +1,7 @@
 <?php
 /**
  * DASHBOARD.PHP
- * - Update: Zoekvenster (popup) een stuk kleiner en subtieler gemaakt.
+ * - Update: Keyset pagination toegevoegd voor snellere navigatie en betere prestaties.
  */
 
 require_once __DIR__ . '/config/config.php';
@@ -23,7 +23,7 @@ if (isset($_GET['ajax_search'])) {
                 FROM feedback_forms f
                 JOIN drivers d ON f.driver_id = d.id
                 WHERE d.name LIKE ? OR d.employee_id LIKE ? 
-                ORDER BY f.created_at DESC LIMIT 5"; // Limit verlaagd naar 5 voor compactheid
+                ORDER BY f.created_at DESC LIMIT 5";
         $stmt = $pdo->prepare($sql);
         $like = "%$term%";
         $stmt->execute([$like, $like]);
@@ -92,11 +92,23 @@ try {
 
 $teamleads = $pdo->query("SELECT id, email, first_name, last_name FROM users ORDER BY first_name ASC")->fetchAll();
 
-// Paginering & Query
-$limit = 8;
-$page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int)$_GET['page'] : 1;
-if ($page < 1) $page = 1;
+// --- KEYSET PAGINATION LOGICA ---
+$limit = 8; // Maximaal 8 per pagina
+$fetchLimit = $limit + 1; // We halen er 1 extra op om te zien of er een volgende pagina is
 
+// Cursor decoderen (formaat: "timestamp|id")
+$cursorDate = null;
+$cursorId = null;
+if (isset($_GET['cursor']) && !empty($_GET['cursor'])) {
+    $decoded = base64_decode($_GET['cursor']);
+    $parts = explode('|', $decoded);
+    if (count($parts) === 2) {
+        $cursorDate = $parts[0];
+        $cursorId = (int)$parts[1];
+    }
+}
+
+// Basis Query
 $sqlBase = "SELECT 
             f.id, f.form_date, f.review_moment, f.status, f.assigned_to_user_id, f.created_at,
             d.name as driver_name, d.employee_id,
@@ -111,6 +123,8 @@ $sqlBase = "SELECT
         WHERE 1=1";
 
 $params = [];
+
+// Filters toepassen
 if ($filterStatus !== '') {
     $sqlBase .= " AND f.status = :status";
     $params[':status'] = $filterStatus;
@@ -120,22 +134,43 @@ if ($filterAssigned === 'me') {
     $params[':my_id'] = $currentUserId;
 }
 
-// Tellen
-$countSql = str_replace("SELECT \n            f.id, f.form_date, f.review_moment, f.status, f.assigned_to_user_id, f.created_at,\n            d.name as driver_name, d.employee_id,\n            u_creator.email as creator_email, \n            u_assigned.email as assigned_email,\n            u_assigned.first_name as assigned_first,\n            u_assigned.last_name as assigned_last", "SELECT COUNT(*)", $sqlBase);
-$stmtCount = $pdo->prepare($countSql);
-$stmtCount->execute($params);
-$totalRows = $stmtCount->fetchColumn();
-$totalPages = ceil($totalRows / $limit);
-if ($page > $totalPages && $totalPages > 0) { $page = $totalPages; }
-$offset = ($page - 1) * $limit;
+// Keyset conditie toevoegen (Haal alles op dat OUDER is dan de cursor)
+// We sorteren op created_at DESC, dus 'volgende' pagina betekent 'kleinere' datum.
+// Bij gelijke datum kijken we naar een lager ID.
+if ($cursorDate && $cursorId) {
+    $sqlBase .= " AND (f.created_at < :c_date OR (f.created_at = :c_date AND f.id < :c_id))";
+    $params[':c_date'] = $cursorDate;
+    $params[':c_id']   = $cursorId;
+}
 
-$sqlBase .= " ORDER BY f.created_at DESC LIMIT :limit OFFSET :offset";
+// Sortering en Limit
+// Belangrijk: We moeten ook sorteren op ID om de volgorde deterministisch te maken
+$sqlBase .= " ORDER BY f.created_at DESC, f.id DESC LIMIT :limit";
+$params[':limit'] = $fetchLimit; // We vragen er 9 op (int)
+
 $stmt = $pdo->prepare($sqlBase);
-foreach ($params as $k => $v) { $stmt->bindValue($k, $v); }
-$stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
-$stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+// Bind parameters
+foreach ($params as $k => $v) {
+    // Limit moet expliciet als INT, anders doet PDO soms moeilijk bij MySQL LIMIT
+    if ($k === ':limit') {
+        $stmt->bindValue($k, $v, PDO::PARAM_INT);
+    } else {
+        $stmt->bindValue($k, $v);
+    }
+}
 $stmt->execute();
 $recentActivities = $stmt->fetchAll();
+
+// Checken voor volgende pagina
+$nextCursor = null;
+if (count($recentActivities) > $limit) {
+    // Er is een volgende pagina, want we hebben meer resultaten dan de limiet
+    array_pop($recentActivities); // Verwijder het 9e item uit de weergave array
+    
+    // Het 8e item (nu het laatste in de array) wordt de cursor voor de volgende pagina
+    $lastItem = end($recentActivities);
+    $nextCursor = base64_encode($lastItem['created_at'] . '|' . $lastItem['id']);
+}
 ?>
 <!DOCTYPE html>
 <html lang="nl">
@@ -187,7 +222,7 @@ $recentActivities = $stmt->fetchAll();
         .pagination a { text-decoration: none; padding: 6px 12px; border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-main); transition: 0.2s; }
         .pagination a:hover { background: #f3f2f2; }
         .pagination .current { color: var(--text-secondary); font-weight: 600; }
-        .pagination .disabled { opacity: 0.5; pointer-events: none; }
+        .pagination .disabled { opacity: 0.5; pointer-events: none; color: #999; padding: 6px 12px; border: 1px solid #eee; border-radius: 4px; }
 
         /* Inline Edit & Badges */
         .view-mode { display: flex; align-items: center; gap: 8px; }
@@ -407,23 +442,34 @@ $recentActivities = $stmt->fetchAll();
                     </table>
                 </div>
 
-                <?php if ($totalPages > 1): 
-                    $qs = http_build_query(array_merge($_GET, ['page' => ''])); 
-                ?>
                 <div class="pagination">
-                    <?php if ($page > 1): ?>
-                        <a href="?<?php echo $qs . ($page - 1); ?>">&laquo; Vorige</a>
+                    <?php if (isset($_GET['cursor'])): ?>
+                        <?php 
+                            // Behoud filters bij reset
+                            $resetQuery = array_merge($_GET, ['cursor' => null]);
+                            // Verwijder cursor uit array indien null (voor schone URL)
+                            unset($resetQuery['cursor']); 
+                        ?>
+                        <a href="?<?php echo http_build_query($resetQuery); ?>">&laquo; Eerste Pagina</a>
                     <?php else: ?>
-                        <a href="#" class="disabled">&laquo; Vorige</a>
+                        <span class="disabled">&laquo; Eerste Pagina</span>
                     <?php endif; ?>
-                    <span class="current">Pagina <?php echo $page; ?></span>
-                    <?php if ($page < $totalPages): ?>
-                        <a href="?<?php echo $qs . ($page + 1); ?>">Volgende &raquo;</a>
+
+                    <span class="current" style="margin: 0 10px; color: #999;">
+                        <?php echo count($recentActivities); ?> resultaten op deze pagina
+                    </span>
+
+                    <?php if ($nextCursor): ?>
+                        <?php 
+                            // Behoud filters en voeg nieuwe cursor toe
+                            $nextQuery = array_merge($_GET, ['cursor' => $nextCursor]); 
+                        ?>
+                        <a href="?<?php echo http_build_query($nextQuery); ?>">Oudere laden &raquo;</a>
                     <?php else: ?>
-                        <a href="#" class="disabled">Volgende &raquo;</a>
+                        <span class="disabled">Oudere laden &raquo;</span>
                     <?php endif; ?>
                 </div>
-                <?php endif; ?>
+
             </div>
         </div>
 
