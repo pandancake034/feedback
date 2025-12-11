@@ -1,7 +1,7 @@
 <?php
 /**
  * DASHBOARD.PHP
- * - Fix: SQLSTATE[HY093] opgelost door unieke parameter namen te gebruiken voor keyset pagination.
+ * - Update: AJAX pagination toegevoegd. Tabel herlaadt nu zonder full page refresh.
  */
 
 require_once __DIR__ . '/config/config.php';
@@ -13,7 +13,7 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
-// --- AJAX HANDLER VOOR LIVE SUGGESTIES ---
+// --- AJAX HANDLER VOOR LIVE SUGGESTIES (ZOEKBALK) ---
 if (isset($_GET['ajax_search'])) {
     header('Content-Type: application/json');
     $term = trim($_GET['ajax_search']);
@@ -93,10 +93,9 @@ try {
 $teamleads = $pdo->query("SELECT id, email, first_name, last_name FROM users ORDER BY first_name ASC")->fetchAll();
 
 // --- KEYSET PAGINATION LOGICA ---
-$limit = 8; // Maximaal 8 per pagina
-$fetchLimit = $limit + 1; // We halen er 1 extra op om te zien of er een volgende pagina is
+$limit = 8;
+$fetchLimit = $limit + 1;
 
-// Cursor decoderen (formaat: "timestamp|id")
 $cursorDate = null;
 $cursorId = null;
 if (isset($_GET['cursor']) && !empty($_GET['cursor'])) {
@@ -108,7 +107,6 @@ if (isset($_GET['cursor']) && !empty($_GET['cursor'])) {
     }
 }
 
-// Basis Query
 $sqlBase = "SELECT 
             f.id, f.form_date, f.review_moment, f.status, f.assigned_to_user_id, f.created_at,
             d.name as driver_name, d.employee_id,
@@ -124,7 +122,6 @@ $sqlBase = "SELECT
 
 $params = [];
 
-// Filters toepassen
 if ($filterStatus !== '') {
     $sqlBase .= " AND f.status = :status";
     $params[':status'] = $filterStatus;
@@ -134,21 +131,18 @@ if ($filterAssigned === 'me') {
     $params[':my_id'] = $currentUserId;
 }
 
-// Keyset conditie toevoegen
 if ($cursorDate && $cursorId) {
-    // FIX: Gebruik unieke parameternamen :c_date1 en :c_date2 omdat PDO::ATTR_EMULATE_PREPARES false is.
+    // Unieke parameter namen ivm emulate prepares
     $sqlBase .= " AND (f.created_at < :c_date1 OR (f.created_at = :c_date2 AND f.id < :c_id))";
     $params[':c_date1'] = $cursorDate;
-    $params[':c_date2'] = $cursorDate; // Dubbel binden voor veiligheid
+    $params[':c_date2'] = $cursorDate;
     $params[':c_id']    = $cursorId;
 }
 
-// Sortering en Limit
 $sqlBase .= " ORDER BY f.created_at DESC, f.id DESC LIMIT :limit";
 $params[':limit'] = $fetchLimit; 
 
 $stmt = $pdo->prepare($sqlBase);
-// Bind parameters
 foreach ($params as $k => $v) {
     if ($k === ':limit') {
         $stmt->bindValue($k, $v, PDO::PARAM_INT);
@@ -159,12 +153,138 @@ foreach ($params as $k => $v) {
 $stmt->execute();
 $recentActivities = $stmt->fetchAll();
 
-// Checken voor volgende pagina
 $nextCursor = null;
 if (count($recentActivities) > $limit) {
     array_pop($recentActivities); 
     $lastItem = end($recentActivities);
     $nextCursor = base64_encode($lastItem['created_at'] . '|' . $lastItem['id']);
+}
+
+// --- GENEREREN VAN HTML VOOR AJAX EN INITIAL LOAD ---
+
+// 1. Tabel Rijen HTML Genereren
+ob_start();
+if (empty($recentActivities)): ?>
+    <tr>
+        <td colspan="7" style="text-align: center; padding: 20px; color: #999;">Geen dossiers gevonden met deze filters.</td>
+    </tr>
+<?php else: 
+    foreach ($recentActivities as $row): 
+        $dateCreated = new DateTime($row['created_at']);
+        $now = new DateTime();
+        $interval = $now->diff($dateCreated);
+        $isOverdue = ($row['status'] === 'open' && $interval->days > 14);
+    ?>
+        <tr>
+            <td class="<?php echo $isOverdue ? 'text-urgent' : ''; ?>">
+                <?php echo htmlspecialchars($row['form_date']); ?>
+                <?php if($isOverdue): ?>
+                    <span class="material-icons-outlined" style="font-size:14px; vertical-align:middle;" title="Reeds <?php echo $interval->days; ?> dagen open">warning</span>
+                <?php endif; ?>
+            </td>
+            <td>
+                <a href="feedback_view.php?id=<?php echo $row['id']; ?>" style="color:var(--brand-color); text-decoration:none; font-weight:700;">
+                    <?php echo htmlspecialchars($row['driver_name']); ?>
+                </a>
+                <div style="font-size:11px; color:#999;"><?php echo htmlspecialchars($row['employee_id'] ?? ''); ?></div>
+            </td>
+            
+            <td><?php echo htmlspecialchars($row['review_moment'] ?? '-'); ?></td>
+            <td><?php echo htmlspecialchars($row['creator_email']); ?></td>
+
+            <td>
+                <div id="view-status-<?php echo $row['id']; ?>" class="view-mode">
+                    <span class="status-badge <?php echo ($row['status'] === 'open') ? 'bg-open' : 'bg-completed'; ?>">
+                        <?php echo ucfirst($row['status']); ?>
+                    </span>
+                    <button class="icon-btn" onclick="toggleEdit('status', <?php echo $row['id']; ?>)"><span class="material-icons-outlined" style="font-size:14px;">edit</span></button>
+                </div>
+                <form method="POST" id="edit-status-<?php echo $row['id']; ?>" class="edit-mode">
+                    <input type="hidden" name="form_id" value="<?php echo $row['id']; ?>">
+                    <input type="hidden" name="update_status" value="1">
+                    <select name="new_status" class="inline-select">
+                        <option value="open">Open</option>
+                        <option value="completed">Completed</option>
+                    </select>
+                    <button type="submit" class="icon-btn save"><span class="material-icons-outlined">check</span></button>
+                    <button type="button" class="icon-btn" onclick="toggleEdit('status', <?php echo $row['id']; ?>)"><span class="material-icons-outlined">close</span></button>
+                </form>
+            </td>
+            
+            <td>
+                <div id="view-assign-<?php echo $row['id']; ?>" class="view-mode">
+                    <?php 
+                        if (!empty($row['assigned_to_user_id'])) {
+                            $displayName = (!empty($row['assigned_first'])) 
+                                ? trim($row['assigned_first'] . ' ' . $row['assigned_last']) 
+                                : $row['assigned_email'];
+                        } else {
+                            $displayName = '<span style="color:#bbb;">--</span>';
+                        }
+                        echo $displayName;
+                    ?>
+                    <button class="icon-btn" onclick="toggleEdit('assign', <?php echo $row['id']; ?>)"><span class="material-icons-outlined" style="font-size:14px;">edit</span></button>
+                </div>
+                <form method="POST" id="edit-assign-<?php echo $row['id']; ?>" class="edit-mode">
+                    <input type="hidden" name="form_id" value="<?php echo $row['id']; ?>">
+                    <select name="assign_user_id" class="inline-select">
+                        <option value="">-- Geen --</option>
+                        <?php foreach ($teamleads as $lead): 
+                            $optName = (!empty($lead['first_name'])) ? trim($lead['first_name'].' '.$lead['last_name']) : $lead['email'];
+                        ?>
+                            <option value="<?php echo $lead['id']; ?>" <?php if($row['assigned_to_user_id'] == $lead['id']) echo 'selected'; ?>><?php echo htmlspecialchars($optName); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <button type="submit" class="icon-btn save"><span class="material-icons-outlined">check</span></button>
+                    <button type="button" class="icon-btn" onclick="toggleEdit('assign', <?php echo $row['id']; ?>)"><span class="material-icons-outlined">close</span></button>
+                </form>
+            </td>
+
+            <td style="text-align:right;">
+                <a href="feedback_view.php?id=<?php echo $row['id']; ?>" style="color:#999;"><span class="material-icons-outlined">visibility</span></a>
+            </td>
+        </tr>
+    <?php endforeach; 
+endif;
+$rowsHtml = ob_get_clean();
+
+// 2. Pagination Controls HTML Genereren
+ob_start(); ?>
+    <?php if (isset($_GET['cursor'])): ?>
+        <?php 
+            $resetQuery = array_merge($_GET, ['cursor' => null]);
+            unset($resetQuery['cursor']); 
+            unset($resetQuery['ajax_pagination']); // Schoonhouden
+        ?>
+        <a href="?<?php echo http_build_query($resetQuery); ?>">&laquo; Eerste Pagina</a>
+    <?php else: ?>
+        <span class="disabled">&laquo; Eerste Pagina</span>
+    <?php endif; ?>
+
+    <span class="current" style="margin: 0 10px; color: #999;">
+        <?php echo count($recentActivities); ?> resultaten op deze pagina
+    </span>
+
+    <?php if ($nextCursor): ?>
+        <?php 
+            $nextQuery = array_merge($_GET, ['cursor' => $nextCursor]); 
+            unset($nextQuery['ajax_pagination']); // Schoonhouden
+        ?>
+        <a href="?<?php echo http_build_query($nextQuery); ?>">Oudere laden &raquo;</a>
+    <?php else: ?>
+        <span class="disabled">Oudere laden &raquo;</span>
+    <?php endif; ?>
+<?php 
+$paginationHtml = ob_get_clean();
+
+// 3. AJAX REQUEST AFHANDELING
+if (isset($_GET['ajax_pagination'])) {
+    header('Content-Type: application/json');
+    echo json_encode([
+        'rows' => $rowsHtml,
+        'pagination' => $paginationHtml
+    ]);
+    exit;
 }
 ?>
 <!DOCTYPE html>
@@ -231,38 +351,26 @@ if (count($recentActivities) > $limit) {
         .inline-select { padding: 4px; border: 1px solid #ccc; border-radius: 4px; font-size: 12px; }
         .text-urgent { color: #c53030; font-weight: 700; }
 
-        /* HEADER SEARCH & OVERLAY (AANGEPAST: KLEINER & SUBTIELER) */
+        /* HEADER SEARCH & OVERLAY */
         .header-search-trigger { background: #f3f2f2; border: 1px solid var(--border-color); border-radius: 6px; padding: 8px 12px; width: 280px; color: var(--text-secondary); font-size: 13px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; transition: background 0.2s; }
         .header-search-trigger:hover { background: #e0e0e0; }
 
         #search-overlay { 
             position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-            background: rgba(0,0,0,0.25); /* Donkere, transparante achtergrond ipv vol wit */
+            background: rgba(0,0,0,0.25); 
             z-index: 9999; display: none; justify-content: center; 
-            padding-top: 15vh; /* Iets lager zetten */
+            padding-top: 15vh; 
         }
 
         .spotlight-container { 
-            width: 100%; 
-            max-width: 400px; /* VEEL KLEINER: was 500px */
-            background: white; 
-            border-radius: 8px; /* Iets minder rond */
-            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.2); 
-            overflow: hidden; 
-            border: 1px solid #e5e7eb; 
-            /* Zorg dat de box niet te hoog wordt */
-            display: flex; flex-direction: column;
-            max-height: 80vh; 
+            width: 100%; max-width: 400px; background: white; border-radius: 8px; 
+            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.2); overflow: hidden; 
+            border: 1px solid #e5e7eb; display: flex; flex-direction: column; max-height: 80vh; 
         }
 
         .spotlight-input-wrapper { display: flex; align-items: center; padding: 12px 16px; border-bottom: 1px solid #eee; }
-        #spotlight-input { border: none; font-size: 16px; width: 100%; outline: none; background: transparent; } /* Font iets kleiner */
-        
-        #spotlight-results { 
-            max-height: 100px; /* VEEL LAGER: was 350px */
-            overflow-y: auto; 
-        }
-        
+        #spotlight-input { border: none; font-size: 16px; width: 100%; outline: none; background: transparent; }
+        #spotlight-results { max-height: 100px; overflow-y: auto; }
         .result-item { padding: 10px 16px; border-bottom: 1px solid #f7f7f7; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-size: 13px; }
         .result-item:hover { background: #f0f9ff; border-left: 3px solid var(--brand-color); }
     </style>
@@ -350,119 +458,14 @@ if (count($recentActivities) > $limit) {
                                 <th style="text-align:right;">Actie</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            <?php if (empty($recentActivities)): ?>
-                                <tr>
-                                    <td colspan="7" style="text-align: center; padding: 20px; color: #999;">Geen dossiers gevonden met deze filters.</td>
-                                </tr>
-                            <?php else: ?>
-                                <?php foreach ($recentActivities as $row): 
-                                    $dateCreated = new DateTime($row['created_at']);
-                                    $now = new DateTime();
-                                    $interval = $now->diff($dateCreated);
-                                    $isOverdue = ($row['status'] === 'open' && $interval->days > 14);
-                                ?>
-                                    <tr>
-                                        <td class="<?php echo $isOverdue ? 'text-urgent' : ''; ?>">
-                                            <?php echo htmlspecialchars($row['form_date']); ?>
-                                            <?php if($isOverdue): ?>
-                                                <span class="material-icons-outlined" style="font-size:14px; vertical-align:middle;" title="Reeds <?php echo $interval->days; ?> dagen open">warning</span>
-                                            <?php endif; ?>
-                                        </td>
-                                        <td>
-                                            <a href="feedback_view.php?id=<?php echo $row['id']; ?>" style="color:var(--brand-color); text-decoration:none; font-weight:700;">
-                                                <?php echo htmlspecialchars($row['driver_name']); ?>
-                                            </a>
-                                            <div style="font-size:11px; color:#999;"><?php echo htmlspecialchars($row['employee_id'] ?? ''); ?></div>
-                                        </td>
-                                        
-                                        <td><?php echo htmlspecialchars($row['review_moment'] ?? '-'); ?></td>
-                                        <td><?php echo htmlspecialchars($row['creator_email']); ?></td>
-
-                                        <td>
-                                            <div id="view-status-<?php echo $row['id']; ?>" class="view-mode">
-                                                <span class="status-badge <?php echo ($row['status'] === 'open') ? 'bg-open' : 'bg-completed'; ?>">
-                                                    <?php echo ucfirst($row['status']); ?>
-                                                </span>
-                                                <button class="icon-btn" onclick="toggleEdit('status', <?php echo $row['id']; ?>)"><span class="material-icons-outlined" style="font-size:14px;">edit</span></button>
-                                            </div>
-                                            <form method="POST" id="edit-status-<?php echo $row['id']; ?>" class="edit-mode">
-                                                <input type="hidden" name="form_id" value="<?php echo $row['id']; ?>">
-                                                <input type="hidden" name="update_status" value="1">
-                                                <select name="new_status" class="inline-select">
-                                                    <option value="open">Open</option>
-                                                    <option value="completed">Completed</option>
-                                                </select>
-                                                <button type="submit" class="icon-btn save"><span class="material-icons-outlined">check</span></button>
-                                                <button type="button" class="icon-btn" onclick="toggleEdit('status', <?php echo $row['id']; ?>)"><span class="material-icons-outlined">close</span></button>
-                                            </form>
-                                        </td>
-                                        
-                                        <td>
-                                            <div id="view-assign-<?php echo $row['id']; ?>" class="view-mode">
-                                                <?php 
-                                                    if (!empty($row['assigned_to_user_id'])) {
-                                                        $displayName = (!empty($row['assigned_first'])) 
-                                                            ? trim($row['assigned_first'] . ' ' . $row['assigned_last']) 
-                                                            : $row['assigned_email'];
-                                                    } else {
-                                                        $displayName = '<span style="color:#bbb;">--</span>';
-                                                    }
-                                                    echo $displayName;
-                                                ?>
-                                                <button class="icon-btn" onclick="toggleEdit('assign', <?php echo $row['id']; ?>)"><span class="material-icons-outlined" style="font-size:14px;">edit</span></button>
-                                            </div>
-                                            <form method="POST" id="edit-assign-<?php echo $row['id']; ?>" class="edit-mode">
-                                                <input type="hidden" name="form_id" value="<?php echo $row['id']; ?>">
-                                                <select name="assign_user_id" class="inline-select">
-                                                    <option value="">-- Geen --</option>
-                                                    <?php foreach ($teamleads as $lead): 
-                                                        $optName = (!empty($lead['first_name'])) ? trim($lead['first_name'].' '.$lead['last_name']) : $lead['email'];
-                                                    ?>
-                                                        <option value="<?php echo $lead['id']; ?>" <?php if($row['assigned_to_user_id'] == $lead['id']) echo 'selected'; ?>><?php echo htmlspecialchars($optName); ?></option>
-                                                    <?php endforeach; ?>
-                                                </select>
-                                                <button type="submit" class="icon-btn save"><span class="material-icons-outlined">check</span></button>
-                                                <button type="button" class="icon-btn" onclick="toggleEdit('assign', <?php echo $row['id']; ?>)"><span class="material-icons-outlined">close</span></button>
-                                            </form>
-                                        </td>
-
-                                        <td style="text-align:right;">
-                                            <a href="feedback_view.php?id=<?php echo $row['id']; ?>" style="color:#999;"><span class="material-icons-outlined">visibility</span></a>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            <?php endif; ?>
+                        <tbody id="feedback-table-body">
+                            <?php echo $rowsHtml; ?>
                         </tbody>
                     </table>
                 </div>
 
-                <div class="pagination">
-                    <?php if (isset($_GET['cursor'])): ?>
-                        <?php 
-                            // Behoud filters bij reset
-                            $resetQuery = array_merge($_GET, ['cursor' => null]);
-                            // Verwijder cursor uit array indien null (voor schone URL)
-                            unset($resetQuery['cursor']); 
-                        ?>
-                        <a href="?<?php echo http_build_query($resetQuery); ?>">&laquo; Eerste Pagina</a>
-                    <?php else: ?>
-                        <span class="disabled">&laquo; Eerste Pagina</span>
-                    <?php endif; ?>
-
-                    <span class="current" style="margin: 0 10px; color: #999;">
-                        <?php echo count($recentActivities); ?> resultaten op deze pagina
-                    </span>
-
-                    <?php if ($nextCursor): ?>
-                        <?php 
-                            // Behoud filters en voeg nieuwe cursor toe
-                            $nextQuery = array_merge($_GET, ['cursor' => $nextCursor]); 
-                        ?>
-                        <a href="?<?php echo http_build_query($nextQuery); ?>">Oudere laden &raquo;</a>
-                    <?php else: ?>
-                        <span class="disabled">Oudere laden &raquo;</span>
-                    <?php endif; ?>
+                <div class="pagination" id="pagination-container">
+                    <?php echo $paginationHtml; ?>
                 </div>
 
             </div>
@@ -483,6 +486,41 @@ if (count($recentActivities) > $limit) {
             }
         }
         
+        // --- PAGINATION AJAX LOGICA ---
+        document.addEventListener('click', function(e) {
+            // Check of er op een link in de pagination div wordt geklikt
+            if (e.target.closest('#pagination-container a')) {
+                e.preventDefault();
+                const link = e.target.closest('a');
+                const url = link.href;
+                
+                // Voeg ajax parameter toe
+                const fetchUrl = new URL(url);
+                fetchUrl.searchParams.append('ajax_pagination', '1');
+
+                // Visual feedback (optioneel, bv opacity iets verlagen)
+                const tableBody = document.getElementById('feedback-table-body');
+                tableBody.style.opacity = '0.5';
+
+                fetch(fetchUrl)
+                    .then(res => res.json())
+                    .then(data => {
+                        // Vervang HTML
+                        tableBody.innerHTML = data.rows;
+                        document.getElementById('pagination-container').innerHTML = data.pagination;
+                        tableBody.style.opacity = '1';
+                        
+                        // Update URL balk zonder refresh
+                        window.history.pushState({}, '', url);
+                    })
+                    .catch(err => {
+                        console.error('Pagination error:', err);
+                        tableBody.style.opacity = '1';
+                    });
+            }
+        });
+
+        // --- SEARCH OVERLAY ---
         const overlay = document.getElementById('search-overlay');
         const input = document.getElementById('spotlight-input');
         const resultsDiv = document.getElementById('spotlight-results');
