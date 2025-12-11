@@ -1,9 +1,7 @@
 <?php
 /**
  * DASHBOARD.PHP
- * - Verbeterd: Filters toegevoegd (Status & Toewijzing)
- * - Verbeterd: Visuele urgentie bij oude openstaande dossiers
- * - Verbeterd: CSV Export optie
+ * - Update: Zoekvenster (popup) een stuk kleiner en subtieler gemaakt.
  */
 
 require_once __DIR__ . '/config/config.php';
@@ -25,7 +23,7 @@ if (isset($_GET['ajax_search'])) {
                 FROM feedback_forms f
                 JOIN drivers d ON f.driver_id = d.id
                 WHERE d.name LIKE ? OR d.employee_id LIKE ? 
-                ORDER BY f.created_at DESC LIMIT 6";
+                ORDER BY f.created_at DESC LIMIT 5"; // Limit verlaagd naar 5 voor compactheid
         $stmt = $pdo->prepare($sql);
         $like = "%$term%";
         $stmt->execute([$like, $like]);
@@ -34,14 +32,13 @@ if (isset($_GET['ajax_search'])) {
     exit;
 }
 
-// 2. LOGICA: CSV EXPORT (NIEUW)
+// 2. CSV EXPORT LOGICA
 if (isset($_GET['export']) && $_GET['export'] === 'csv') {
     header('Content-Type: text/csv');
     header('Content-Disposition: attachment; filename="feedback_export_'.date('Y-m-d').'.csv"');
     $output = fopen('php://output', 'w');
     fputcsv($output, ['ID', 'Datum', 'Chauffeur', 'Personeelsnr', 'Review Moment', 'Status', 'Toegewezen Aan', 'Gemaakt Door']);
     
-    // Simpele query voor export (alle data, of gefilterd indien gewenst)
     $sqlExport = "SELECT f.id, f.form_date, d.name, d.employee_id, f.review_moment, f.status, u.email as assigned, c.email as creator
                   FROM feedback_forms f
                   JOIN drivers d ON f.driver_id = d.id
@@ -58,9 +55,8 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
 
 include __DIR__ . '/includes/sidebar.php';
 
-// 3. LOGICA: OPSLAAN (POST)
+// 3. OPSLAAN LOGICA (POST)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // A. Toewijzing opslaan
     if (isset($_POST['assign_user_id'], $_POST['form_id'])) {
         try {
             $stmt = $pdo->prepare("UPDATE feedback_forms SET assigned_to_user_id = ? WHERE id = ?");
@@ -69,7 +65,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             header("Location: dashboard.php?msg=assigned"); exit;
         } catch (PDOException $e) {}
     }
-    // B. Status wijzigen
     if (isset($_POST['update_status'], $_POST['form_id'], $_POST['new_status'])) {
         try {
             $stmt = $pdo->prepare("UPDATE feedback_forms SET status = ? WHERE id = ?");
@@ -79,16 +74,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// 4. DATA OPHALEN & FILTERS (NIEUW)
+// 4. DATA & FILTERS
 $userEmail = $_SESSION['email'];
 $currentUserId = $_SESSION['user_id'];
 $msg = $_GET['msg'] ?? '';
 
-// Filters ophalen uit URL
 $filterStatus = $_GET['filter_status'] ?? '';
 $filterAssigned = $_GET['filter_assigned'] ?? '';
 
-// Statistieken
+// KPI Stats
 $stats = ['drivers' => 0, 'open_feedback' => 0, 'closed_feedback' => 0];
 try {
     $stats['drivers'] = $pdo->query("SELECT COUNT(*) FROM drivers")->fetchColumn();
@@ -98,12 +92,11 @@ try {
 
 $teamleads = $pdo->query("SELECT id, email, first_name, last_name FROM users ORDER BY first_name ASC")->fetchAll();
 
-// --- PAGINERING & QUERY OPBOUW ---
+// Paginering & Query
 $limit = 8;
 $page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int)$_GET['page'] : 1;
 if ($page < 1) $page = 1;
 
-// Base Query
 $sqlBase = "SELECT 
             f.id, f.form_date, f.review_moment, f.status, f.assigned_to_user_id, f.created_at,
             d.name as driver_name, d.employee_id,
@@ -118,8 +111,6 @@ $sqlBase = "SELECT
         WHERE 1=1";
 
 $params = [];
-
-// Filters toepassen (NIEUW)
 if ($filterStatus !== '') {
     $sqlBase .= " AND f.status = :status";
     $params[':status'] = $filterStatus;
@@ -129,7 +120,7 @@ if ($filterAssigned === 'me') {
     $params[':my_id'] = $currentUserId;
 }
 
-// Tellen voor paginering (met filters!)
+// Tellen
 $countSql = str_replace("SELECT \n            f.id, f.form_date, f.review_moment, f.status, f.assigned_to_user_id, f.created_at,\n            d.name as driver_name, d.employee_id,\n            u_creator.email as creator_email, \n            u_assigned.email as assigned_email,\n            u_assigned.first_name as assigned_first,\n            u_assigned.last_name as assigned_last", "SELECT COUNT(*)", $sqlBase);
 $stmtCount = $pdo->prepare($countSql);
 $stmtCount->execute($params);
@@ -138,7 +129,6 @@ $totalPages = ceil($totalRows / $limit);
 if ($page > $totalPages && $totalPages > 0) { $page = $totalPages; }
 $offset = ($page - 1) * $limit;
 
-// Definitieve query
 $sqlBase .= " ORDER BY f.created_at DESC LIMIT :limit OFFSET :offset";
 $stmt = $pdo->prepare($sqlBase);
 foreach ($params as $k => $v) { $stmt->bindValue($k, $v); }
@@ -181,7 +171,7 @@ $recentActivities = $stmt->fetchAll();
         .alert-toast { background: var(--success-bg); color: var(--success-text); padding: 10px 15px; border-radius: 4px; margin-bottom: 20px; border: 1px solid #a7f3d0; display: flex; align-items: center; gap: 10px; font-size: 14px; }
         .btn-brand { background: var(--brand-color); color: white; padding: 8px 16px; border-radius: 4px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
 
-        /* Filters Toolbar (NIEUW) */
+        /* Filters Toolbar */
         .filter-toolbar { display: flex; gap: 10px; align-items: center; padding: 12px 16px; background: #fcfcfc; border-bottom: 1px solid var(--border-color); }
         .filter-select { padding: 6px 10px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 13px; color: var(--text-main); }
         .btn-filter { padding: 6px 12px; background: white; border: 1px solid var(--border-color); border-radius: 4px; cursor: pointer; font-size: 13px; }
@@ -209,19 +199,41 @@ $recentActivities = $stmt->fetchAll();
         .bg-open { background: #fffbeb; color: #b45309; border: 1px solid #fcd34d; }
         .bg-completed { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
         .inline-select { padding: 4px; border: 1px solid #ccc; border-radius: 4px; font-size: 12px; }
-
-        /* Overdue styling (NIEUW) */
         .text-urgent { color: #c53030; font-weight: 700; }
-        
-        /* Header Search Trigger & Overlay */
+
+        /* HEADER SEARCH & OVERLAY (AANGEPAST: KLEINER & SUBTIELER) */
         .header-search-trigger { background: #f3f2f2; border: 1px solid var(--border-color); border-radius: 6px; padding: 8px 12px; width: 280px; color: var(--text-secondary); font-size: 13px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; transition: background 0.2s; }
         .header-search-trigger:hover { background: #e0e0e0; }
-        #search-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.85); backdrop-filter: blur(5px); z-index: 9999; display: none; justify-content: center; padding-top: 12vh; }
-        .spotlight-container { width: 100%; max-width: 500px; background: white; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); overflow: hidden; border: 1px solid #e5e7eb; }
-        .spotlight-input-wrapper { display: flex; align-items: center; padding: 16px 20px; border-bottom: 1px solid #eee; }
-        #spotlight-input { border: none; font-size: 18px; width: 100%; outline: none; background: transparent; }
-        #spotlight-results { max-height: 350px; overflow-y: auto; }
-        .result-item { padding: 12px 20px; border-bottom: 1px solid #f7f7f7; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+
+        #search-overlay { 
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(0,0,0,0.25); /* Donkere, transparante achtergrond ipv vol wit */
+            z-index: 9999; display: none; justify-content: center; 
+            padding-top: 15vh; /* Iets lager zetten */
+        }
+
+        .spotlight-container { 
+            width: 100%; 
+            max-width: 400px; /* VEEL KLEINER: was 500px */
+            background: white; 
+            border-radius: 8px; /* Iets minder rond */
+            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.2); 
+            overflow: hidden; 
+            border: 1px solid #e5e7eb; 
+            /* Zorg dat de box niet te hoog wordt */
+            display: flex; flex-direction: column;
+            max-height: 80vh; 
+        }
+
+        .spotlight-input-wrapper { display: flex; align-items: center; padding: 12px 16px; border-bottom: 1px solid #eee; }
+        #spotlight-input { border: none; font-size: 16px; width: 100%; outline: none; background: transparent; } /* Font iets kleiner */
+        
+        #spotlight-results { 
+            max-height: 200px; /* VEEL LAGER: was 350px */
+            overflow-y: auto; 
+        }
+        
+        .result-item { padding: 10px 16px; border-bottom: 1px solid #f7f7f7; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-size: 13px; }
         .result-item:hover { background: #f0f9ff; border-left: 3px solid var(--brand-color); }
     </style>
 </head>
@@ -230,12 +242,12 @@ $recentActivities = $stmt->fetchAll();
     <div id="search-overlay">
         <div class="spotlight-container">
             <div class="spotlight-input-wrapper">
-                <span class="material-icons-outlined" style="margin-right:12px; color:#999; font-size:22px;">search</span>
-                <input type="text" id="spotlight-input" placeholder="Zoek op naam of nummer..." autocomplete="off">
-                <span class="material-icons-outlined" style="cursor:pointer; color:#ccc;" onclick="closeSearch()">close</span>
+                <span class="material-icons-outlined" style="margin-right:12px; color:#999; font-size:20px;">search</span>
+                <input type="text" id="spotlight-input" placeholder="Zoek op naam..." autocomplete="off">
+                <span class="material-icons-outlined" style="cursor:pointer; color:#ccc; font-size: 20px;" onclick="closeSearch()">close</span>
             </div>
             <div id="spotlight-results"></div>
-            <div style="background:#fafafa; padding:8px 20px; font-size:11px; color:#999; border-top:1px solid #eee;">
+            <div style="background:#fafafa; padding:8px 16px; font-size:11px; color:#999; border-top:1px solid #eee;">
                 ESC om te sluiten
             </div>
         </div>
@@ -315,8 +327,6 @@ $recentActivities = $stmt->fetchAll();
                                 </tr>
                             <?php else: ?>
                                 <?php foreach ($recentActivities as $row): 
-                                    // URGENTIE LOGICA (NIEUW)
-                                    // Als status open is EN ouder dan 14 dagen = Rood
                                     $dateCreated = new DateTime($row['created_at']);
                                     $now = new DateTime();
                                     $interval = $now->diff($dateCreated);
@@ -398,7 +408,7 @@ $recentActivities = $stmt->fetchAll();
                 </div>
 
                 <?php if ($totalPages > 1): 
-                    $qs = http_build_query(array_merge($_GET, ['page' => ''])); // Huidige filters bewaren
+                    $qs = http_build_query(array_merge($_GET, ['page' => ''])); 
                 ?>
                 <div class="pagination">
                     <?php if ($page > 1): ?>
@@ -432,7 +442,6 @@ $recentActivities = $stmt->fetchAll();
             }
         }
         
-        // Spotlight Search Logic
         const overlay = document.getElementById('search-overlay');
         const input = document.getElementById('spotlight-input');
         const resultsDiv = document.getElementById('spotlight-results');
