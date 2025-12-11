@@ -212,7 +212,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     <main class="main-content">
         <div class="page-body">
-            <h1 style="margin-top: 0; margin-bottom: 20px;"><?php echo $is_new ? 'Nieuw Gesprek' : 'Gesprek Bewerken'; ?></h1>
+            <h1 style="margin-top: 0; margin-bottom: 20px;"><?php echo $is_new ? 'Nieuw feedbackgesprek toevoegen' : 'Gesprek Bewerken'; ?></h1>
 
             <?php if ($error): ?>
                 <div style="background: #fde8e8; color: #ea001e; padding: 10px; border-radius: 4px; margin-bottom: 20px; border: 1px solid #fbd5d5;"><?php echo $error; ?></div>
