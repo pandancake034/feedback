@@ -1,7 +1,8 @@
 <?php
 /**
  * DASHBOARD.PHP
- * - Update: AJAX pagination toegevoegd. Tabel herlaadt nu zonder full page refresh.
+ * - Update: Terug naar normale paginering (Offset-based).
+ * - Feature: AJAX update van tabel behouden (geen page reload).
  */
 
 require_once __DIR__ . '/config/config.php';
@@ -92,21 +93,12 @@ try {
 
 $teamleads = $pdo->query("SELECT id, email, first_name, last_name FROM users ORDER BY first_name ASC")->fetchAll();
 
-// --- KEYSET PAGINATION LOGICA ---
+// --- PAGINERING LOGICA (OFFSET BASED) ---
 $limit = 8;
-$fetchLimit = $limit + 1;
+$page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int)$_GET['page'] : 1;
+if ($page < 1) $page = 1;
 
-$cursorDate = null;
-$cursorId = null;
-if (isset($_GET['cursor']) && !empty($_GET['cursor'])) {
-    $decoded = base64_decode($_GET['cursor']);
-    $parts = explode('|', $decoded);
-    if (count($parts) === 2) {
-        $cursorDate = $parts[0];
-        $cursorId = (int)$parts[1];
-    }
-}
-
+// Query opbouw
 $sqlBase = "SELECT 
             f.id, f.form_date, f.review_moment, f.status, f.assigned_to_user_id, f.created_at,
             d.name as driver_name, d.employee_id,
@@ -131,38 +123,36 @@ if ($filterAssigned === 'me') {
     $params[':my_id'] = $currentUserId;
 }
 
-if ($cursorDate && $cursorId) {
-    // Unieke parameter namen ivm emulate prepares
-    $sqlBase .= " AND (f.created_at < :c_date1 OR (f.created_at = :c_date2 AND f.id < :c_id))";
-    $params[':c_date1'] = $cursorDate;
-    $params[':c_date2'] = $cursorDate;
-    $params[':c_id']    = $cursorId;
-}
+// 1. Tellen voor paginering
+$countSql = str_replace(
+    "SELECT \n            f.id, f.form_date, f.review_moment, f.status, f.assigned_to_user_id, f.created_at,\n            d.name as driver_name, d.employee_id,\n            u_creator.email as creator_email, \n            u_assigned.email as assigned_email,\n            u_assigned.first_name as assigned_first,\n            u_assigned.last_name as assigned_last", 
+    "SELECT COUNT(*)", 
+    $sqlBase
+);
 
-$sqlBase .= " ORDER BY f.created_at DESC, f.id DESC LIMIT :limit";
-$params[':limit'] = $fetchLimit; 
+$stmtCount = $pdo->prepare($countSql);
+$stmtCount->execute($params);
+$totalRows = $stmtCount->fetchColumn();
+$totalPages = ceil($totalRows / $limit);
 
+// Correctie als pagina te hoog is
+if ($page > $totalPages && $totalPages > 0) { $page = $totalPages; }
+$offset = ($page - 1) * $limit;
+
+// 2. Data ophalen
+$sqlBase .= " ORDER BY f.created_at DESC LIMIT :limit OFFSET :offset";
 $stmt = $pdo->prepare($sqlBase);
-foreach ($params as $k => $v) {
-    if ($k === ':limit') {
-        $stmt->bindValue($k, $v, PDO::PARAM_INT);
-    } else {
-        $stmt->bindValue($k, $v);
-    }
-}
+
+foreach ($params as $k => $v) { $stmt->bindValue($k, $v); }
+$stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+$stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
 $stmt->execute();
 $recentActivities = $stmt->fetchAll();
 
-$nextCursor = null;
-if (count($recentActivities) > $limit) {
-    array_pop($recentActivities); 
-    $lastItem = end($recentActivities);
-    $nextCursor = base64_encode($lastItem['created_at'] . '|' . $lastItem['id']);
-}
 
-// --- GENEREREN VAN HTML VOOR AJAX EN INITIAL LOAD ---
+// --- HTML GENEREREN VOOR AJAX EN INITIAL LOAD ---
 
-// 1. Tabel Rijen HTML Genereren
+// A. Tabel Rijen HTML
 ob_start();
 if (empty($recentActivities)): ?>
     <tr>
@@ -248,31 +238,29 @@ if (empty($recentActivities)): ?>
 endif;
 $rowsHtml = ob_get_clean();
 
-// 2. Pagination Controls HTML Genereren
-ob_start(); ?>
-    <?php if (isset($_GET['cursor'])): ?>
-        <?php 
-            $resetQuery = array_merge($_GET, ['cursor' => null]);
-            unset($resetQuery['cursor']); 
-            unset($resetQuery['ajax_pagination']); // Schoonhouden
-        ?>
-        <a href="?<?php echo http_build_query($resetQuery); ?>">&laquo; Eerste Pagina</a>
+// B. Pagination Controls HTML
+ob_start();
+$qs = $_GET; // Kopieer huidige query parameters
+unset($qs['ajax_pagination']); // Verwijder technische parameter
+?>
+    <?php if ($page > 1): 
+        $qs['page'] = $page - 1;
+    ?>
+        <a href="?<?php echo http_build_query($qs); ?>">&laquo; Vorige</a>
     <?php else: ?>
-        <span class="disabled">&laquo; Eerste Pagina</span>
+        <span class="disabled">&laquo; Vorige</span>
     <?php endif; ?>
 
     <span class="current" style="margin: 0 10px; color: #999;">
-        <?php echo count($recentActivities); ?> resultaten op deze pagina
+        Pagina <?php echo $page; ?> van <?php echo max(1, $totalPages); ?>
     </span>
 
-    <?php if ($nextCursor): ?>
-        <?php 
-            $nextQuery = array_merge($_GET, ['cursor' => $nextCursor]); 
-            unset($nextQuery['ajax_pagination']); // Schoonhouden
-        ?>
-        <a href="?<?php echo http_build_query($nextQuery); ?>">Oudere laden &raquo;</a>
+    <?php if ($page < $totalPages): 
+        $qs['page'] = $page + 1;
+    ?>
+        <a href="?<?php echo http_build_query($qs); ?>">Volgende &raquo;</a>
     <?php else: ?>
-        <span class="disabled">Oudere laden &raquo;</span>
+        <span class="disabled">Volgende &raquo;</span>
     <?php endif; ?>
 <?php 
 $paginationHtml = ob_get_clean();
