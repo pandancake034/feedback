@@ -267,7 +267,7 @@ $recentActivities = $stmt->fetchAll();
         <div class="page-body">
             
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
-                <h1>Dashboard</h1>
+                <h1>FeedbackFlow</h1>
                 <a href="feedback_form.php" class="btn-brand"><span class="material-icons-outlined">add</span> Nieuw Gesprek</a>
             </div>
 
