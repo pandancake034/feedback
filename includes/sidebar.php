@@ -19,14 +19,14 @@ $is_admin = (isset($_SESSION['role']) && $_SESSION['role'] === 'admin');
         <li class="nav-item">
             <a href="<?php echo BASE_URL; ?>/dashboard.php" class="<?php echo ($current_page == 'dashboard.php') ? 'active' : ''; ?>">
                 <span class="material-icons-outlined">dashboard</span>
-                Dashboard
+                Home
             </a>
         </li>
 
         <li class="nav-item">
             <a href="<?php echo BASE_URL; ?>/feedback_form.php" class="<?php echo ($current_page == 'feedback_form.php' || $current_page == 'feedback_create.php') ? 'active' : ''; ?>">
                 <span class="material-icons-outlined">add_circle</span>
-                Nieuw Gesprek
+                Nieuw gesprek
             </a>
         </li>
 
@@ -34,7 +34,7 @@ $is_admin = (isset($_SESSION['role']) && $_SESSION['role'] === 'admin');
         <li class="nav-item">
             <a href="<?php echo BASE_URL; ?>/admin/index.php" class="<?php echo ($is_admin_page) ? 'active' : ''; ?>">
                 <span class="material-icons-outlined">admin_panel_settings</span>
-                Admin Beheer
+                Admin
             </a>
         </li>
         <?php endif; ?>
