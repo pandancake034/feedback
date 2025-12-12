@@ -8,6 +8,7 @@
 require_once __DIR__ . '/config/config.php';
 require_once __DIR__ . '/config/db.php';
 
+
 // 1. BEVEILIGING
 if (!isset($_SESSION['user_id'])) {
     header("Location: login.php");
@@ -353,33 +354,7 @@ if (isset($_GET['ajax_pagination'])) {
         </div>
     </div>
 
-    <main class="main-content">
-        <header class="top-header">
-            <div class="header-search-trigger" onclick="openSearch()">
-                <div style="display:flex; align-items:center; gap:8px;">
-                    <span class="material-icons-outlined" style="font-size:18px;">search</span> Zoeken...
-                </div>
-                <span style="background:white; border:1px solid #ccc; border-radius:4px; padding:0 6px; font-size:11px;">/</span>
-            </div>
-            <div style="font-size:13px; font-weight:600; display:flex; align-items:center; gap:8px;">
-                <span class="material-icons-outlined">account_circle</span> <?php echo htmlspecialchars($userEmail); ?>
-                <a href="logout.php" style="color:#777; text-decoration:none; margin-left:10px;"><span class="material-icons-outlined">logout</span></a>
-            </div>
-        </header>
-
-        <div class="page-body">
-            
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
-                <h1>FeedbackFlow</h1>
-                <div style="display:flex; gap: 10px;">
-                    <a href="dashboard.php?export=csv" class="btn-brand" style="background: white; color: var(--text-main); border: 1px solid var(--border-color);">
-                        <span class="material-icons-outlined">download</span> Export
-                    </a>
-                    <a href="feedback_form.php" class="btn-brand">
-                        <span class="material-icons-outlined">add</span> Nieuw Gesprek
-                    </a>
-                </div>
-            </div>
+<?php include __DIR__ . '/includes/header.php'; ?>
 
             <?php if ($msg): ?>
                 <div class="alert-toast"><span class="material-icons-outlined">info</span> Update: <?php echo htmlspecialchars($msg); ?></div>
