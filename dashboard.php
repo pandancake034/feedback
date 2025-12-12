@@ -1,7 +1,7 @@
 <?php
 /**
  * DASHBOARD.PHP
- * - Versie: 2.2 (Header include toegevoegd)
+ * - Versie: 2.3 (Layout hersteld: Sidebar & Main wrapper correct geplaatst)
  * - Feature: AJAX update van tabel & zoekbalk.
  */
 
@@ -17,9 +17,7 @@ if (!isset($_SESSION['user_id'])) {
 
 // --- AJAX HANDLER VOOR LIVE SUGGESTIES (ZOEKBALK) ---
 if (isset($_GET['ajax_search'])) {
-    // Wis output buffers om JSON fouten te voorkomen
     while (ob_get_level()) { ob_end_clean(); }
-    
     header('Content-Type: application/json');
     $term = trim($_GET['ajax_search']);
     if (strlen($term) < 1) { echo json_encode([]); exit; }
@@ -39,7 +37,7 @@ if (isset($_GET['ajax_search'])) {
 
 // 2. CSV EXPORT LOGICA
 if (isset($_GET['export']) && $_GET['export'] === 'csv') {
-    while (ob_get_level()) { ob_end_clean(); } // Buffer wissen voor schone download
+    while (ob_get_level()) { ob_end_clean(); }
     header('Content-Type: text/csv');
     header('Content-Disposition: attachment; filename="feedback_export_'.date('Y-m-d').'.csv"');
     $output = fopen('php://output', 'w');
@@ -58,8 +56,6 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
     fclose($output);
     exit;
 }
-
-include __DIR__ . '/includes/sidebar.php';
 
 // 3. OPSLAAN LOGICA (POST - INLINE EDITS)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -95,31 +91,25 @@ try {
 
 $teamleads = $pdo->query("SELECT id, email, first_name, last_name FROM users ORDER BY first_name ASC")->fetchAll();
 
-// --- PAGINERING LOGICA (ROBUUSTE METHODE) ---
+// --- PAGINERING LOGICA ---
 $limit = 8;
 $page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int)$_GET['page'] : 1;
 if ($page < 1) $page = 1;
 
-// Deel A: De "Body" van de query (zonder SELECT)
 $sqlBody = " FROM feedback_forms f
              JOIN drivers d ON f.driver_id = d.id
              JOIN users u_creator ON f.created_by_user_id = u_creator.id
              LEFT JOIN users u_assigned ON f.assigned_to_user_id = u_assigned.id";
 
-// Deel B: Tellen
 try {
     $stmtCount = $pdo->query("SELECT COUNT(*) " . $sqlBody);
     $totalRows = $stmtCount->fetchColumn();
-} catch (PDOException $e) {
-    $totalRows = 0;
-}
+} catch (PDOException $e) { $totalRows = 0; }
 
-// Deel C: Pagina berekening
 $totalPages = ceil($totalRows / $limit);
 if ($page > $totalPages && $totalPages > 0) { $page = $totalPages; }
 $offset = ($page - 1) * $limit;
 
-// Deel D: Data ophalen
 $sqlFields = "SELECT 
             f.id, f.form_date, f.review_moment, f.status, f.assigned_to_user_id, f.created_at,
             d.name as driver_name, d.employee_id,
@@ -254,9 +244,7 @@ $paginationHtml = ob_get_clean();
 
 // 3. AJAX REQUEST AFHANDELING
 if (isset($_GET['ajax_pagination'])) {
-    // CRUCIAAL: Buffers wissen om 'white-space injection' uit includes te verwijderen
     while (ob_get_level()) { ob_end_clean(); }
-    
     header('Content-Type: application/json');
     echo json_encode([
         'rows' => $rowsHtml,
@@ -354,7 +342,13 @@ if (isset($_GET['ajax_pagination'])) {
         </div>
     </div>
 
-<?php include __DIR__ . '/includes/header.php'; ?>
+    <?php include __DIR__ . '/includes/sidebar.php'; ?>
+
+    <main class="main-content">
+        
+        <?php include __DIR__ . '/includes/header.php'; ?>
+
+        <div class="page-body">
 
             <?php if ($msg): ?>
                 <div class="alert-toast"><span class="material-icons-outlined">info</span> Update: <?php echo htmlspecialchars($msg); ?></div>
