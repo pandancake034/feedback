@@ -1,7 +1,7 @@
 <?php
 /**
  * DASHBOARD.PHP
- * - Versie: 2.1 (Fix voor paginering knoppen die niet reageren)
+ * - Versie: 2.2 (Header include toegevoegd)
  * - Feature: AJAX update van tabel & zoekbalk.
  */
 
