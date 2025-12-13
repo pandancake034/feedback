@@ -237,7 +237,7 @@ $page_title = "Dossier Inzien";
                     <div class="card-header">1. Prestaties & Scores</div>
                     <div class="card-body">
                         <div class="detail-row">
-                            <div class="label">OTD Score</div>
+                            <div class="label">OTD score:</div>
                             <div class="value">
                                 <?php 
                                     $otdVal = floatval($form['otd_score']);
@@ -247,7 +247,7 @@ $page_title = "Dossier Inzien";
                             </div>
                         </div>
                         <div class="detail-row">
-                            <div class="label">FTR Score</div>
+                            <div class="label">FTR score:</div>
                             <div class="value">
                                 <?php 
                                     $ftrVal = floatval($form['ftr_score']);
@@ -257,19 +257,19 @@ $page_title = "Dossier Inzien";
                             </div>
                         </div>
                         <div class="detail-row">
-                            <div class="label">KW Score</div>
+                            <div class="label">KW verbruik E-vito:</div>
                             <div class="value"><?php echo htmlspecialchars($form['kw_score'] ?: '-'); ?></div>
                         </div>
                         <div class="detail-row">
-                            <div class="label">Routes</div>
+                            <div class="label">Aantal routes:</div>
                             <div class="value"><?php echo htmlspecialchars($form['routes_count']); ?></div>
                         </div>
                         <div class="detail-row">
-                            <div class="label">Fouten / Errors</div>
+                            <div class="label">Fouten (errors):</div>
                             <div class="value"><?php echo nl2br(htmlspecialchars($form['errors_text'] ?: 'Geen bijzonderheden')); ?></div>
                         </div>
                         <div class="detail-row">
-                            <div class="label">Te Laat</div>
+                            <div class="label">Te laat:</div>
                             <div class="value"><?php echo nl2br(htmlspecialchars($form['late_text'] ?: 'Geen bijzonderheden')); ?></div>
                         </div>
                     </div>
@@ -279,11 +279,11 @@ $page_title = "Dossier Inzien";
                     <div class="card-header">2. Gedrag & Beoordeling</div>
                     <div class="card-body">
                         <div class="detail-row">
-                            <div class="label">Rijgedrag</div>
+                            <div class="label">Rijgedrag:</div>
                             <div class="value"><?php echo nl2br(htmlspecialchars($form['driving_behavior'] ?: '-')); ?></div>
                         </div>
                         <div class="detail-row">
-                            <div class="label">Waarschuwingen</div>
+                            <div class="label">Waarschuwingen:</div>
                             <div class="value" style="color: #c53030;"><?php echo nl2br(htmlspecialchars($form['warnings'] ?: 'Geen')); ?></div>
                         </div>
                         <div class="detail-row">
@@ -294,7 +294,7 @@ $page_title = "Dossier Inzien";
                             <div class="label">Beoordeling</div>
                             <div class="value">
                                 Vaardigheden: <strong><?php echo $form['skills_rating']; ?>/5</strong> • 
-                                Vakbekwaamheid: <strong><?php echo $form['proficiency_rating']; ?>/5</strong>
+                                Proficiency level: <strong><?php echo $form['proficiency_rating']; ?>/5</strong>
                             </div>
                         </div>
                     </div>
