@@ -342,7 +342,7 @@ if (isset($_GET['ajax_pagination'])) {
 
             <div class="card">
                 <div class="filter-toolbar">
-                    <div style="font-weight:700; font-size:16px; color:var(--brand-dark);">FeedbackFlow</div>
+                    <div style="font-weight:700; font-size:16px; color:var(--brand-dark);">Recente dossiers</div>
                 </div>
 
                 <div style="overflow-x: auto;">
