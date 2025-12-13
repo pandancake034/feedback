@@ -3,13 +3,14 @@
 require_once 'config/config.php'; // Voor sessies en instellingen
 require_once 'config/db.php';     // Voor de database verbinding
 
-// Check of gebruiker al is ingelogd
-if (isset($_SESSION['user_id'])) {
+// Check of gebruiker al is ingelogd (alleen als er geen succes-actie net is geweest)
+if (isset($_SESSION['user_id']) && empty($_POST)) {
     header("Location: dashboard.php");
     exit;
 }
 
 $error_message = "";
+$login_success = false; // Nieuwe variabele om status bij te houden
 
 // Verwerk het formulier als er op de knop gedrukt is
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
@@ -38,8 +39,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 $logStmt = $pdo->prepare("INSERT INTO system_logs (user_id, action_type, description, ip_address) VALUES (?, 'LOGIN', 'Gebruiker is ingelogd', ?)");
                 $logStmt->execute([$user['id'], $_SERVER['REMOTE_ADDR']]);
 
-                header("Location: dashboard.php");
-                exit;
+                // AANPASSING: In plaats van direct doorsturen, zetten we de succes vlag op true
+                $login_success = true;
+                
             } else {
                 $error_message = "Ongeldig e-mailadres of wachtwoord.";
             }
@@ -90,12 +92,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         .login-card {
             background-color: #fff;
             padding: 40px;
-            border-radius: 4px; /* Enterprise style is vaak iets hoekiger dan 12px */
+            border-radius: 4px;
             border: 1px solid var(--border-color);
             box-shadow: var(--card-shadow);
             width: 100%;
             max-width: 400px;
             text-align: center;
+            min-height: 400px; /* Zorgt dat de kaart niet verspringt in hoogte */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
         }
 
         .app-logo {
@@ -175,7 +181,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             background-color: var(--brand-dark);
         }
 
-        /* Error box stijl */
         .alert {
             padding: 12px;
             border-radius: 4px;
@@ -198,43 +203,90 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             font-size: 12px;
             color: var(--text-secondary);
         }
+
+        /* --- SPINNER STYLES --- */
+        .spinner-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+        }
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #f3f3f3; /* Lichte grijze rand */
+            border-top: 5px solid var(--brand-color); /* Blauwe rand */
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .success-text {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--brand-color);
+            animation: fadeIn 0.5s ease-in;
+        }
     </style>
 </head>
 <body>
 
 <div class="login-card">
-    <div class="app-logo">
-        <span class="material-icons-outlined" style="font-size: 28px; color: var(--brand-color);">local_shipping</span>
-        FeedbackFlow 
-    </div>
     
-    <h2>Welkom terug</h2>
+    <?php if ($login_success): ?>
+        <div class="spinner-container">
+            <div class="spinner"></div>
+            <div class="success-text">Succesvol ingelogd!</div>
+            <div style="font-size: 13px; color: #999; margin-top: 8px;">Je wordt doorgestuurd...</div>
+        </div>
+        
+        <script>
+            setTimeout(function() {
+                window.location.href = "dashboard.php";
+            }, 1500);
+        </script>
 
-    <?php if (!empty($error_message)): ?>
-        <div class="alert alert-danger">
-            <span class="material-icons-outlined" style="font-size: 18px;">error_outline</span>
-            <?php echo htmlspecialchars($error_message); ?>
+    <?php else: ?>
+        <div style="width: 100%;">
+            <div class="app-logo">
+                <span class="material-icons-outlined" style="font-size: 28px; color: var(--brand-color);">local_shipping</span>
+                LogistiekApp
+            </div>
+            
+            <h2>Welkom terug</h2>
+
+            <?php if (!empty($error_message)): ?>
+                <div class="alert alert-danger">
+                    <span class="material-icons-outlined" style="font-size: 18px;">error_outline</span>
+                    <?php echo htmlspecialchars($error_message); ?>
+                </div>
+            <?php endif; ?>
+
+            <form method="POST" action="login.php">
+                <div class="input-group">
+                    <label for="email">E-mailadres</label>
+                    <input type="email" id="email" name="email" placeholder="naam@bedrijf.nl" required value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>">
+                </div>
+
+                <div class="input-group">
+                    <label for="password">Wachtwoord</label>
+                    <input type="password" id="password" name="password" placeholder="Voer je wachtwoord in" required>
+                    <span class="material-icons-outlined toggle-password" onclick="togglePassword()">visibility</span>
+                </div>
+
+                <button type="submit">Inloggen</button>
+            </form>
+            
+            <div class="footer-text">
+                &copy; <?php echo date('Y'); ?> <?php echo defined('APP_TITLE') ? APP_TITLE : 'Chauffeurs Dossier'; ?>
+            </div>
         </div>
     <?php endif; ?>
 
-    <form method="POST" action="login.php">
-        <div class="input-group">
-            <label for="email">E-mailadres</label>
-            <input type="email" id="email" name="email" placeholder="naam@bedrijf.nl" required value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>">
-        </div>
-
-        <div class="input-group">
-            <label for="password">Wachtwoord</label>
-            <input type="password" id="password" name="password" placeholder="Voer je wachtwoord in" required>
-            <span class="material-icons-outlined toggle-password" onclick="togglePassword()">visibility</span>
-        </div>
-
-        <button type="submit">Inloggen</button>
-    </form>
-    
-    <div class="footer-text">
-        &copy; <?php echo date('Y'); ?> <?php echo defined('APP_TITLE') ? APP_TITLE : 'Chauffeurs Dossier'; ?>
-    </div>
 </div>
 
 <script>
