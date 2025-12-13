@@ -126,19 +126,20 @@ if (empty($recentActivities)): ?>
     <tr>
         <td colspan="7" style="text-align: center; padding: 20px; color: #999;">Nog geen dossiers aangemaakt.</td>
     </tr>
-<?php 
+<?php else: 
     foreach ($recentActivities as $row): 
-        // 1. Bestaande logica voor het 'warning' icoontje (laten we staan)
         $dateCreated = new DateTime($row['created_at']);
         $now = new DateTime();
         $interval = $now->diff($dateCreated);
+        
+        // Dit is voor het uitroepteken icoontje (als het dossier lang open staat na aanmaak)
         $isOverdue = ($row['status'] === 'open' && $interval->days > 14);
 
-        // 2. NIEUWE LOGICA VOOR BLINKEN:
-        // We checken of de datum van het gesprek (form_date) kleiner is dan vandaag.
+        // --- AANPASSING HIER ---
+        // Check of de planningsdatum (form_date) in het verleden ligt
         $isDateExpired = ($row['form_date'] < date('Y-m-d'));
 
-        // De rij knippert alleen als hij OPEN is én de datum VERLOPEN is
+        // Pas knipperen als status 'open' is EN de datum verlopen is
         $rowClass = ($row['status'] === 'open' && $isDateExpired) ? 'blink-row' : '';
     ?>
         <tr class="<?php echo $rowClass; ?>">
