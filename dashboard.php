@@ -136,7 +136,7 @@ if (empty($recentActivities)): ?>
         // BEPAAL DE CLASS VOOR DE RIJ
         $rowClass = ($row['status'] === 'open') ? 'blink-row' : '';
     ?>
-        <tr>
+        <tr class="<?php echo $rowClass; ?>">
             <td class="<?php echo $isOverdue ? 'text-urgent' : ''; ?>">
                 <?php echo htmlspecialchars($row['form_date']); ?>
                 <?php if($isOverdue): ?>
