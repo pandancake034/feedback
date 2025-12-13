@@ -6,15 +6,15 @@
                 <?php echo htmlspecialchars($page_title); ?>
             </div>
         <?php else: ?>
-            <div class="search-bar">
-                <input type="text" placeholder="Zoeken..." style="border: 1px solid var(--border-color); padding: 8px 12px; border-radius: 4px; font-size: 13px;">
+            <div class="search-bar" onclick="if(typeof openSearch === 'function') openSearch();">
+                <input type="text" placeholder="Druk op '/' om te zoeken..." readonly style="cursor: pointer; border: 1px solid var(--border-color); padding: 8px 12px; border-radius: 4px; font-size: 13px; background: #f9f9f9;">
             </div>
         <?php endif; ?>
     </div>
 
     <div id="live-clock" style="font-size: 13px; font-weight: 600; color: var(--text-secondary); display: flex; align-items: center; gap: 6px;">
         <span class="material-icons-outlined" style="font-size: 16px;">schedule</span>
-        <span id="clock-text"><?php echo date('d-m-Y H:i'); ?></span>
+        <span id="clock-text"><?php echo date('l d-m-Y H:i'); ?></span>
     </div>
 
     <div class="user-profile" style="display:flex; align-items:center;">
@@ -29,18 +29,21 @@
         (function() {
             function updateClock() {
                 const now = new Date();
-                const day = String(now.getDate()).padStart(2, '0');
-                const month = String(now.getMonth() + 1).padStart(2, '0');
-                const year = now.getFullYear();
-                const hours = String(now.getHours()).padStart(2, '0');
-                const minutes = String(now.getMinutes()).padStart(2, '0');
-                
-                const timeString = `${day}-${month}-${year} ${hours}:${minutes}`;
+                // Nederlandse notatie: bv. zaterdag 13-12-2025 14:30
+                const options = { 
+                    weekday: 'long', 
+                    year: 'numeric', 
+                    month: '2-digit', 
+                    day: '2-digit', 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                };
+                const timeString = now.toLocaleDateString('nl-NL', options).replace(',', '');
                 const clockEl = document.getElementById('clock-text');
-                if(clockEl) clockEl.innerText = timeString;
+                if(clockEl) clockEl.innerText = timeString.charAt(0).toUpperCase() + timeString.slice(1);
             }
-            // Update elke seconde (zodat de minuutsprong direct zichtbaar is)
             setInterval(updateClock, 1000);
+            updateClock(); // Direct uitvoeren bij laden
         })();
     </script>
 </header>

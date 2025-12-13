@@ -1,13 +1,11 @@
 <?php
 /**
  * DASHBOARD.PHP
- * - Versie: 2.3 (Layout hersteld: Sidebar & Main wrapper correct geplaatst)
- * - Feature: AJAX update van tabel & zoekbalk.
+ * - Features: Live Search Popup, ECharts Grafiek, Inline Editing
  */
 
 require_once __DIR__ . '/config/config.php';
 require_once __DIR__ . '/config/db.php';
-
 
 // 1. BEVEILIGING
 if (!isset($_SESSION['user_id'])) {
@@ -35,26 +33,25 @@ if (isset($_GET['ajax_search'])) {
     exit;
 }
 
-// 2. CSV EXPORT LOGICA
-if (isset($_GET['export']) && $_GET['export'] === 'csv') {
-    while (ob_get_level()) { ob_end_clean(); }
-    header('Content-Type: text/csv');
-    header('Content-Disposition: attachment; filename="feedback_export_'.date('Y-m-d').'.csv"');
-    $output = fopen('php://output', 'w');
-    fputcsv($output, ['ID', 'Datum', 'Chauffeur', 'Personeelsnr', 'Review Moment', 'Status', 'Toegewezen Aan', 'Gemaakt Door']);
-    
-    $sqlExport = "SELECT f.id, f.form_date, d.name, d.employee_id, f.review_moment, f.status, u.email as assigned, c.email as creator
-                  FROM feedback_forms f
-                  JOIN drivers d ON f.driver_id = d.id
-                  LEFT JOIN users u ON f.assigned_to_user_id = u.id
-                  LEFT JOIN users c ON f.created_by_user_id = c.id
-                  ORDER BY f.form_date DESC LIMIT 1000";
-    $stmt = $pdo->query($sqlExport);
-    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-        fputcsv($output, $row);
+// 2. DATA VOOR GRAFIEK (PER WEEK)
+// We halen de data op van de laatste 12 weken
+$chartWeeks = [];
+$chartCounts = [];
+try {
+    $sqlChart = "SELECT YEARWEEK(form_date, 1) as week_nr, COUNT(*) as total 
+                 FROM feedback_forms 
+                 GROUP BY week_nr 
+                 ORDER BY week_nr ASC 
+                 LIMIT 12";
+    $stmtChart = $pdo->query($sqlChart);
+    while($row = $stmtChart->fetch(PDO::FETCH_ASSOC)) {
+        // Weeknummer formatteren naar leesbaar (bv. Week 42)
+        $w = substr($row['week_nr'], -2);
+        $chartWeeks[] = "Week " . $w;
+        $chartCounts[] = $row['total'];
     }
-    fclose($output);
-    exit;
+} catch (PDOException $e) {
+    // Fallback als er iets misgaat
 }
 
 // 3. OPSLAAN LOGICA (POST - INLINE EDITS)
@@ -77,11 +74,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // 4. DATA & STATISTIEKEN
-$userEmail = $_SESSION['email'];
-$currentUserId = $_SESSION['user_id'];
-$msg = $_GET['msg'] ?? '';
-
-// KPI Stats
 $stats = ['drivers' => 0, 'open_feedback' => 0, 'closed_feedback' => 0];
 try {
     $stats['drivers'] = $pdo->query("SELECT COUNT(*) FROM drivers")->fetchColumn();
@@ -90,6 +82,7 @@ try {
 } catch (PDOException $e) {}
 
 $teamleads = $pdo->query("SELECT id, email, first_name, last_name FROM users ORDER BY first_name ASC")->fetchAll();
+$msg = $_GET['msg'] ?? '';
 
 // --- PAGINERING LOGICA ---
 $limit = 8;
@@ -127,9 +120,7 @@ $stmt->execute();
 $recentActivities = $stmt->fetchAll();
 
 
-// --- HTML GENEREREN VOOR AJAX EN INITIAL LOAD ---
-
-// A. Tabel Rijen HTML
+// --- HTML GENEREREN VOOR TABEL (HERGEBRUIK) ---
 ob_start();
 if (empty($recentActivities)): ?>
     <tr>
@@ -155,10 +146,8 @@ if (empty($recentActivities)): ?>
                 </a>
                 <div style="font-size:11px; color:#999;"><?php echo htmlspecialchars($row['employee_id'] ?? ''); ?></div>
             </td>
-            
             <td><?php echo htmlspecialchars($row['review_moment'] ?? '-'); ?></td>
             <td><?php echo htmlspecialchars($row['creator_email']); ?></td>
-
             <td>
                 <div id="view-status-<?php echo $row['id']; ?>" class="view-mode">
                     <span class="status-badge <?php echo ($row['status'] === 'open') ? 'bg-open' : 'bg-completed'; ?>">
@@ -177,7 +166,6 @@ if (empty($recentActivities)): ?>
                     <button type="button" class="icon-btn" onclick="toggleEdit('status', <?php echo $row['id']; ?>)"><span class="material-icons-outlined">close</span></button>
                 </form>
             </td>
-            
             <td>
                 <div id="view-assign-<?php echo $row['id']; ?>" class="view-mode">
                     <?php 
@@ -206,7 +194,6 @@ if (empty($recentActivities)): ?>
                     <button type="button" class="icon-btn" onclick="toggleEdit('assign', <?php echo $row['id']; ?>)"><span class="material-icons-outlined">close</span></button>
                 </form>
             </td>
-
             <td style="text-align:right;">
                 <a href="feedback_view.php?id=<?php echo $row['id']; ?>" style="color:#999;"><span class="material-icons-outlined">visibility</span></a>
             </td>
@@ -215,26 +202,17 @@ if (empty($recentActivities)): ?>
 endif;
 $rowsHtml = ob_get_clean();
 
-// B. Pagination Controls HTML
+// B. Pagination HTML
 ob_start();
-$qs = $_GET; 
-unset($qs['ajax_pagination']); 
+$qs = $_GET; unset($qs['ajax_pagination']); 
 ?>
-    <?php if ($page > 1): 
-        $qs['page'] = $page - 1;
-    ?>
+    <?php if ($page > 1): $qs['page'] = $page - 1; ?>
         <a href="?<?php echo http_build_query($qs); ?>">&laquo; Vorige</a>
     <?php else: ?>
         <span class="disabled">&laquo; Vorige</span>
     <?php endif; ?>
-
-    <span class="current" style="margin: 0 10px; color: #999;">
-        Pagina <?php echo $page; ?> van <?php echo max(1, $totalPages); ?>
-    </span>
-
-    <?php if ($page < $totalPages): 
-        $qs['page'] = $page + 1;
-    ?>
+    <span class="current" style="margin: 0 10px; color: #999;">Pagina <?php echo $page; ?> van <?php echo max(1, $totalPages); ?></span>
+    <?php if ($page < $totalPages): $qs['page'] = $page + 1; ?>
         <a href="?<?php echo http_build_query($qs); ?>">Volgende &raquo;</a>
     <?php else: ?>
         <span class="disabled">Volgende &raquo;</span>
@@ -242,14 +220,11 @@ unset($qs['ajax_pagination']);
 <?php 
 $paginationHtml = ob_get_clean();
 
-// 3. AJAX REQUEST AFHANDELING
+// AJAX RESPONSE als dit een fetch request is
 if (isset($_GET['ajax_pagination'])) {
     while (ob_get_level()) { ob_end_clean(); }
     header('Content-Type: application/json');
-    echo json_encode([
-        'rows' => $rowsHtml,
-        'pagination' => $paginationHtml
-    ]);
+    echo json_encode(['rows' => $rowsHtml, 'pagination' => $paginationHtml]);
     exit;
 }
 ?>
@@ -258,6 +233,7 @@ if (isset($_GET['ajax_pagination'])) {
 <head>
     <meta charset="UTF-8">
     <title><?php echo defined('APP_TITLE') ? APP_TITLE : 'Dashboard'; ?></title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
@@ -281,12 +257,11 @@ if (isset($_GET['ajax_pagination'])) {
 
         /* Cards & Grid */
         .grid-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
-        .card { background: white; border: 1px solid var(--border-color); border-radius: 4px; box-shadow: 0 2px 2px rgba(0,0,0,0.1); }
+        .card { background: white; border: 1px solid var(--border-color); border-radius: 4px; box-shadow: 0 2px 2px rgba(0,0,0,0.1); margin-bottom: 24px; }
         .card-body { padding: 16px; }
         .kpi-value { font-size: 32px; font-weight: 300; } .kpi-label { font-size: 13px; color: var(--text-secondary); }
         .alert-toast { background: var(--success-bg); color: var(--success-text); padding: 10px 15px; border-radius: 4px; margin-bottom: 20px; border: 1px solid #a7f3d0; display: flex; align-items: center; gap: 10px; font-size: 14px; }
-        .btn-brand { background: var(--brand-color); color: white; padding: 8px 16px; border-radius: 4px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
-
+        
         /* Filters Toolbar */
         .filter-toolbar { padding: 12px 16px; background: #fcfcfc; border-bottom: 1px solid var(--border-color); display:flex; align-items:center; }
 
@@ -307,23 +282,27 @@ if (isset($_GET['ajax_pagination'])) {
         .edit-mode { display: none; align-items: center; gap: 4px; }
         .icon-btn { cursor: pointer; color: #999; font-size: 16px; transition: color 0.2s; background: none; border: none; padding: 2px; }
         .icon-btn:hover { color: var(--brand-color); }
-        .icon-btn.save { color: var(--success-text); }
         .status-badge { padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
         .bg-open { background: #fffbeb; color: #b45309; border: 1px solid #fcd34d; }
         .bg-completed { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
         .inline-select { padding: 4px; border: 1px solid #ccc; border-radius: 4px; font-size: 12px; }
         .text-urgent { color: #c53030; font-weight: 700; }
 
-        /* HEADER SEARCH & OVERLAY */
-        .header-search-trigger { background: #f3f2f2; border: 1px solid var(--border-color); border-radius: 6px; padding: 8px 12px; width: 280px; color: var(--text-secondary); font-size: 13px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; transition: background 0.2s; }
-        .header-search-trigger:hover { background: #e0e0e0; }
-        #search-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.25); z-index: 9999; display: none; justify-content: center; padding-top: 15vh; }
-        .spotlight-container { width: 100%; max-width: 400px; background: white; border-radius: 8px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.2); overflow: hidden; border: 1px solid #e5e7eb; display: flex; flex-direction: column; max-height: 80vh; }
-        .spotlight-input-wrapper { display: flex; align-items: center; padding: 12px 16px; border-bottom: 1px solid #eee; }
-        #spotlight-input { border: none; font-size: 16px; width: 100%; outline: none; background: transparent; }
-        #spotlight-results { max-height: 100px; overflow-y: auto; }
-        .result-item { padding: 10px 16px; border-bottom: 1px solid #f7f7f7; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-size: 13px; }
-        .result-item:hover { background: #f0f9ff; border-left: 3px solid var(--brand-color); }
+        /* SEARCH OVERLAY (POPUP) */
+        #search-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 9999; display: none; justify-content: center; padding-top: 15vh; backdrop-filter: blur(2px); }
+        .spotlight-container { width: 100%; max-width: 600px; background: white; border-radius: 8px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); overflow: hidden; display: flex; flex-direction: column; max-height: 60vh; animation: slideDown 0.2s ease-out; }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .spotlight-input-wrapper { display: flex; align-items: center; padding: 16px 20px; border-bottom: 1px solid #eee; }
+        #spotlight-input { border: none; font-size: 18px; width: 100%; outline: none; background: transparent; color: var(--text-main); }
+        #spotlight-results { overflow-y: auto; }
+        .result-item { padding: 12px 20px; border-bottom: 1px solid #f7f7f7; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-size: 14px; transition: background 0.1s; }
+        .result-item:hover { background: #f0f9ff; border-left: 4px solid var(--brand-color); padding-left: 16px; }
+        .no-results { padding: 20px; color: #999; text-align: center; font-style: italic; }
+        .key-hint { background: #eee; padding: 2px 6px; border-radius: 4px; font-size: 11px; color: #666; border: 1px solid #ddd; margin-left: 8px; }
+
+        /* Chart Container */
+        #chart-container { width: 100%; height: 350px; }
     </style>
 </head>
 <body>
@@ -331,13 +310,14 @@ if (isset($_GET['ajax_pagination'])) {
     <div id="search-overlay">
         <div class="spotlight-container">
             <div class="spotlight-input-wrapper">
-                <span class="material-icons-outlined" style="margin-right:12px; color:#999; font-size:20px;">search</span>
-                <input type="text" id="spotlight-input" placeholder="Zoek op naam..." autocomplete="off">
+                <span class="material-icons-outlined" style="margin-right:12px; color:var(--brand-color); font-size:24px;">search</span>
+                <input type="text" id="spotlight-input" placeholder="Zoek op naam of personeelsnummer..." autocomplete="off">
                 <span class="material-icons-outlined" style="cursor:pointer; color:#ccc; font-size: 20px;" onclick="closeSearch()">close</span>
             </div>
             <div id="spotlight-results"></div>
-            <div style="background:#fafafa; padding:8px 16px; font-size:11px; color:#999; border-top:1px solid #eee;">
-                ESC om te sluiten
+            <div style="background:#fafafa; padding:8px 20px; font-size:11px; color:#999; border-top:1px solid #eee; display:flex; justify-content:space-between;">
+                <span>Gebruik pijltjestoetsen om te navigeren</span>
+                <span>ESC om te sluiten</span>
             </div>
         </div>
     </div>
@@ -362,7 +342,7 @@ if (isset($_GET['ajax_pagination'])) {
 
             <div class="card">
                 <div class="filter-toolbar">
-                    <div style="font-weight:700; font-size:14px;">Recente Dossiers</div>
+                    <div style="font-weight:700; font-size:16px; color:var(--brand-dark);">FeedbackFlow</div>
                 </div>
 
                 <div style="overflow-x: auto;">
@@ -387,8 +367,17 @@ if (isset($_GET['ajax_pagination'])) {
                 <div class="pagination" id="pagination-container">
                     <?php echo $paginationHtml; ?>
                 </div>
-
             </div>
+
+            <div class="card">
+                <div class="filter-toolbar">
+                    <div style="font-weight:700; font-size:14px;">Aantal dossiers per week</div>
+                </div>
+                <div class="card-body">
+                    <div id="chart-container"></div>
+                </div>
+            </div>
+
         </div>
 
         <?php include __DIR__ . '/includes/footer.php'; ?>
@@ -406,79 +395,122 @@ if (isset($_GET['ajax_pagination'])) {
             }
         }
         
-        // --- PAGINATION AJAX LOGICA MET FALLBACK ---
-        document.addEventListener('click', function(e) {
-            if (e.target.closest('#pagination-container a')) {
-                const link = e.target.closest('a');
-                // Alleen intercepteren als het een normale klik is (geen ctrl/cmd klik)
-                if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
-                    e.preventDefault();
-                    const url = link.href;
-                    
-                    const fetchUrl = new URL(url);
-                    fetchUrl.searchParams.append('ajax_pagination', '1');
+        // --- ECHARTS GRAFIEK CONFIGURATIE ---
+        document.addEventListener('DOMContentLoaded', function() {
+            var chartDom = document.getElementById('chart-container');
+            var myChart = echarts.init(chartDom);
+            var option;
 
-                    const tableBody = document.getElementById('feedback-table-body');
-                    tableBody.style.opacity = '0.5';
-
-                    fetch(fetchUrl)
-                        .then(res => {
-                            if (!res.ok) throw new Error('Network response was not ok');
-                            return res.json();
-                        })
-                        .then(data => {
-                            // Succes: update de tabel
-                            tableBody.innerHTML = data.rows;
-                            document.getElementById('pagination-container').innerHTML = data.pagination;
-                            tableBody.style.opacity = '1';
-                            window.history.pushState({}, '', url);
-                        })
-                        .catch(err => {
-                            console.warn('AJAX Pagination mislukt, fallback naar normale navigatie.', err);
-                            // FALLBACK: Als AJAX faalt (bijv. door JSON error), volg gewoon de link!
-                            window.location.href = url;
-                        });
-                }
-            }
+            option = {
+                tooltip: { trigger: 'axis' },
+                grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+                xAxis: {
+                    type: 'category',
+                    boundaryGap: false,
+                    data: <?php echo json_encode($chartWeeks); ?> // PHP Data
+                },
+                yAxis: { type: 'value' },
+                series: [
+                    {
+                        name: 'Dossiers',
+                        type: 'line',
+                        smooth: true,
+                        itemStyle: { color: '#0176d3' },
+                        areaStyle: {
+                            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                                { offset: 0, color: 'rgba(1, 118, 211, 0.5)' },
+                                { offset: 1, color: 'rgba(1, 118, 211, 0.05)' }
+                            ])
+                        },
+                        data: <?php echo json_encode($chartCounts); ?> // PHP Data
+                    }
+                ]
+            };
+            option && myChart.setOption(option);
+            
+            // Resize chart bij window resize
+            window.addEventListener('resize', function() { myChart.resize(); });
         });
 
-        // --- SEARCH OVERLAY ---
+        // --- SEARCH OVERLAY LOGICA ---
         const overlay = document.getElementById('search-overlay');
         const input = document.getElementById('spotlight-input');
         const resultsDiv = document.getElementById('spotlight-results');
 
-        function openSearch() { overlay.style.display = 'flex'; input.focus(); }
-        function closeSearch() { overlay.style.display = 'none'; input.value = ''; resultsDiv.innerHTML = ''; }
+        function openSearch() { 
+            overlay.style.display = 'flex'; 
+            input.focus(); 
+        }
+        function closeSearch() { 
+            overlay.style.display = 'none'; 
+            input.value = ''; 
+            resultsDiv.innerHTML = ''; 
+        }
         
         overlay.addEventListener('click', (e) => { if(e.target===overlay) closeSearch(); });
         document.addEventListener('keydown', (e) => {
+            // Sluiten met ESC
             if(e.key === 'Escape') closeSearch();
+            
+            // Openen met '/' (alleen als we niet al in een input zitten)
             if(e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
-                e.preventDefault(); openSearch();
+                e.preventDefault(); 
+                openSearch();
             }
         });
 
+        // Live Search AJAX
         let timer;
         input.addEventListener('input', () => {
             clearTimeout(timer);
             if(input.value.length < 1) { resultsDiv.innerHTML = ''; return; }
+            
             timer = setTimeout(() => {
                 fetch(`dashboard.php?ajax_search=${encodeURIComponent(input.value)}`)
                     .then(r => r.json())
                     .then(data => {
                         resultsDiv.innerHTML = '';
-                        if(data.length===0) { resultsDiv.innerHTML = '<div style="padding:15px;color:#999;">Geen resultaten.</div>'; }
-                        else {
+                        if(data.length === 0) { 
+                            resultsDiv.innerHTML = '<div class="no-results">Geen dossiers gevonden.</div>'; 
+                        } else {
                             data.forEach(item => {
                                 const d = document.createElement('div');
-                                d.className='result-item';
-                                d.innerHTML=`<div><b>${item.name}</b><div style="font-size:12px;color:#999;">${item.employee_id || ''} • ${item.form_date}</div></div>`;
-                                d.onclick = () => window.location.href=`feedback_view.php?id=${item.form_id}`;
+                                d.className = 'result-item';
+                                d.innerHTML = `
+                                    <div>
+                                        <div style="font-weight:600; color:#0176d3;">${item.name}</div>
+                                        <div style="font-size:12px; color:#706e6b;">${item.employee_id || 'Geen ID'} • ${item.form_date}</div>
+                                    </div>
+                                    <span class="material-icons-outlined" style="font-size:16px; color:#ccc;">arrow_forward</span>
+                                `;
+                                d.onclick = () => window.location.href = `feedback_view.php?id=${item.form_id}`;
                                 resultsDiv.appendChild(d);
                             });
                         }
                     });
-            }, 200);
+            }, 250); // Wacht 250ms na typen
+        });
+        
+        // --- PAGINATION AJAX FALLBACK ---
+        // (Dezelfde code als voorheen behouden voor tabel paginering)
+        document.addEventListener('click', function(e) {
+            if (e.target.closest('#pagination-container a')) {
+                const link = e.target.closest('a');
+                if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+                    e.preventDefault();
+                    const url = link.href;
+                    const fetchUrl = new URL(url);
+                    fetchUrl.searchParams.append('ajax_pagination', '1');
+                    const tableBody = document.getElementById('feedback-table-body');
+                    tableBody.style.opacity = '0.5';
+                    fetch(fetchUrl).then(res => res.json()).then(data => {
+                        tableBody.innerHTML = data.rows;
+                        document.getElementById('pagination-container').innerHTML = data.pagination;
+                        tableBody.style.opacity = '1';
+                        window.history.pushState({}, '', url);
+                    });
+                }
+            }
         });
     </script>
 </body>
