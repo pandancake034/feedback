@@ -126,15 +126,20 @@ if (empty($recentActivities)): ?>
     <tr>
         <td colspan="7" style="text-align: center; padding: 20px; color: #999;">Nog geen dossiers aangemaakt.</td>
     </tr>
-<?php else: 
+<?php 
     foreach ($recentActivities as $row): 
+        // 1. Bestaande logica voor het 'warning' icoontje (laten we staan)
         $dateCreated = new DateTime($row['created_at']);
         $now = new DateTime();
         $interval = $now->diff($dateCreated);
         $isOverdue = ($row['status'] === 'open' && $interval->days > 14);
 
-        // BEPAAL DE CLASS VOOR DE RIJ
-        $rowClass = ($row['status'] === 'open') ? 'blink-row' : '';
+        // 2. NIEUWE LOGICA VOOR BLINKEN:
+        // We checken of de datum van het gesprek (form_date) kleiner is dan vandaag.
+        $isDateExpired = ($row['form_date'] < date('Y-m-d'));
+
+        // De rij knippert alleen als hij OPEN is én de datum VERLOPEN is
+        $rowClass = ($row['status'] === 'open' && $isDateExpired) ? 'blink-row' : '';
     ?>
         <tr class="<?php echo $rowClass; ?>">
             <td class="<?php echo $isOverdue ? 'text-urgent' : ''; ?>">
