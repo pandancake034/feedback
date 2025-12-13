@@ -294,7 +294,7 @@ $page_title = "Dossier Inzien";
                             <div class="label">Beoordeling</div>
                             <div class="value">
                                 Skills: <strong><?php echo $form['skills_rating']; ?>/5</strong> • 
-                                Proficiency level: <strong><?php echo $form['proficiency_rating']; ?>/5</strong>
+                                Vakbekwaamheid: <strong><?php echo $form['proficiency_rating']; ?>/5</strong>
                             </div>
                         </div>
                     </div>
