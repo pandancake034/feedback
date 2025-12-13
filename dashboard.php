@@ -334,11 +334,34 @@ if (isset($_GET['ajax_pagination'])) {
                 <div class="alert-toast"><span class="material-icons-outlined">info</span> Update: <?php echo htmlspecialchars($msg); ?></div>
             <?php endif; ?>
 
-            <div class="grid-row">
-                <div class="card"><div class="card-body"><div class="kpi-value"><?php echo $stats['drivers']; ?></div><div class="kpi-label">Aantal dossiers</div></div></div>
-                <div class="card"><div class="card-body"><div class="kpi-value"><?php echo $stats['open_feedback']; ?></div><div class="kpi-label">Openstaande dossiers</div></div></div>
-                <div class="card"><div class="card-body"><div class="kpi-value"><?php echo $stats['closed_feedback']; ?></div><div class="kpi-label">Gesloten dossiers</div></div></div>
+            <<div class="grid-row">
+    <div class="card">
+        <div class="card-body">
+            <div class="kpi-value"><?php echo $stats['drivers']; ?></div>
+            <div class="kpi-label" style="background-color: #e0e7ff; color: #3730a3; padding: 2px 8px; border-radius: 12px; display: inline-block; font-weight: 600;">
+                Aantal dossiers
             </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <div class="kpi-value"><?php echo $stats['open_feedback']; ?></div>
+            <div class="kpi-label" style="background-color: #fffbeb; color: #b45309; padding: 2px 8px; border-radius: 12px; display: inline-block; font-weight: 600;">
+                Openstaande dossiers
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <div class="kpi-value"><?php echo $stats['closed_feedback']; ?></div>
+            <div class="kpi-label" style="background-color: #d1fae5; color: #065f46; padding: 2px 8px; border-radius: 12px; display: inline-block; font-weight: 600;">
+                Gesloten dossiers
+            </div>
+        </div>
+    </div>
+</div>
 
             <div class="card">
                 <div class="filter-toolbar" style="justify-content: space-between; align-items: center;">
