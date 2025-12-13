@@ -105,7 +105,7 @@ $page_title = "Dossier Inzien";
         .value { font-size: 14px; color: var(--text-main); line-height: 1.4; }
         
         /* Scores Visuals */
-        .score-badge { display: inline-block; padding: 4px 8px; border-radius: 4px; background: #e0e7ff; color: #3730a3; font-weight: 700; font-size: 13px; }
+        .score-badge { display: inline-block; padding: 4px 8px; border-radius: 4px; background: #e0e7ff; color: #ca564eff; font-weight: 700; font-size: 13px; }
         .score-badge.success { background: #d1fae5; color: #065f46; } 
         
         /* Timeline / Notes */
