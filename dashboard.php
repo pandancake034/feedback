@@ -132,6 +132,9 @@ if (empty($recentActivities)): ?>
         $now = new DateTime();
         $interval = $now->diff($dateCreated);
         $isOverdue = ($row['status'] === 'open' && $interval->days > 14);
+
+        // BEPAAL DE CLASS VOOR DE RIJ
+        $rowClass = ($row['status'] === 'open') ? 'blink-row' : '';
     ?>
         <tr>
             <td class="<?php echo $isOverdue ? 'text-urgent' : ''; ?>">
@@ -303,6 +306,18 @@ if (isset($_GET['ajax_pagination'])) {
 
         /* Chart Container */
         #chart-container { width: 100%; height: 350px; }
+
+
+        /* --- ANIMATIE VOOR OPEN DOSSIERS --- */
+@keyframes softBlinkRed {
+    0% { background-color: #ffffff; }
+    50% { background-color: #ffe5e5; } /* Zacht rood */
+    100% { background-color: #ffffff; }
+}
+
+.blink-row {
+    animation: softBlinkRed 3s infinite ease-in-out;
+}
     </style>
 </head>
 <body>
