@@ -342,9 +342,9 @@ if (isset($_GET['ajax_pagination'])) {
 
             <div class="card">
                 <div class="filter-toolbar" style="justify-content: space-between; align-items: center;">
-    <h3 style="margin: 0; font-size: 18px; color: var(--brand-dark);">FeedbackFlow</h3>
+    <h3 style="margin: 0; font-size: 18px; color: var(--brand-dark);">Recente dossiers</h3>
     
-    <a href="feedback_create.php" style="background-color: var(--brand-color); color: white; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+    <a href="feedback_form.php" style="background-color: var(--brand-color); color: white; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px;">
         <span class="material-icons-outlined" style="font-size: 18px;">add</span>
         Nieuw gesprek
     </a>
