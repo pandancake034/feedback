@@ -254,7 +254,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         <div style="width: 100%;">
             <div class="app-logo">
                 <span class="material-icons-outlined" style="font-size: 28px; color: var(--brand-color);">local_shipping</span>
-                LogistiekApp
+                FeedbackFlow
             </div>
             
             <h2>Welkom terug</h2>
