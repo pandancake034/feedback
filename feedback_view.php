@@ -2,6 +2,7 @@
 /**
  * FEEDBACK_VIEW.PHP
  * High-end versie: Visualisaties, Steppers en CSRF beveiliging.
+ * Update: Inclusief Logo (print), Rijgedrag en Complimenten.
  */
 
 require_once __DIR__ . '/config/config.php';
@@ -24,7 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['note_content'])) {
         $stmt = $pdo->prepare("INSERT INTO notes (driver_id, user_id, content) VALUES (?, ?, ?)");
         $stmt->execute([$driver_id, $_SESSION['user_id'], $_POST['note_content']]);
         
-        // Redirect met succes melding (wordt opgepikt door SweetAlert in footer)
+        // Redirect met succes melding
         header("Location: feedback_view.php?id=" . $form_id . "&msg=saved");
         exit;
     } catch (PDOException $e) {
@@ -60,7 +61,7 @@ try {
 
 $page_title = "Dossier Inzien";
 
-// Helper functie voor initialen (alleen hier nodig voor de tijdlijn visuals)
+// Helper functie voor initialen
 function getInitials($name) {
     $parts = explode(' ', $name);
     $initials = '';
@@ -100,9 +101,9 @@ function getInitials($name) {
         .detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
         .detail-item { margin-bottom: 8px; }
         .label { font-size: 12px; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; margin-bottom: 4px; }
-        .value { font-size: 15px; color: var(--text-main); font-weight: 500; }
+        .value { font-size: 15px; color: var(--text-main); font-weight: 500; line-height: 1.5; }
         
-        /* PROGRESS BARS (NIEUW) */
+        /* PROGRESS BARS */
         .progress-wrapper { margin-top: 5px; }
         .progress-bg { height: 6px; background: #eee; border-radius: 3px; overflow: hidden; width: 100%; }
         .progress-fill { height: 100%; background: var(--brand-color); border-radius: 3px; transition: width 0.5s ease; }
@@ -110,29 +111,30 @@ function getInitials($name) {
         .progress-fill.warning { background: #f59e0b; } /* Oranje */
         .progress-text { font-size: 12px; font-weight: 700; float: right; margin-top: -18px; color: var(--text-main); }
 
-        /* STEPPER (NIEUW) */
+        /* STEPPER */
         .stepper { display: flex; align-items: center; margin-bottom: 24px; background: white; padding: 20px; border-radius: 6px; border: 1px solid var(--border-color); }
         .step { flex: 1; position: relative; text-align: center; font-size: 13px; color: var(--text-light); font-weight: 600; }
         .step::after { content: ''; position: absolute; top: 14px; left: 50%; width: 100%; height: 2px; background: #eee; z-index: 1; }
         .step:last-child::after { display: none; }
         .step-icon { width: 30px; height: 30px; background: #eee; color: #999; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 8px; position: relative; z-index: 2; font-size: 16px; transition: 0.3s; }
-        
         .step.active .step-icon { background: var(--brand-color); color: white; box-shadow: 0 0 0 4px rgba(1, 118, 211, 0.2); }
         .step.completed .step-icon { background: #10b981; color: white; }
         .step.completed::after { background: #10b981; }
 
-        /* TIMELINE / CHAT (UPDATE) */
+        /* TIMELINE / CHAT */
         .timeline { margin-top: 10px; }
         .timeline-item { display: flex; gap: 12px; margin-bottom: 20px; }
         .avatar { width: 36px; height: 36px; background: #e0e7ff; color: var(--brand-color); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .note-bubble { background: #f9f9f9; padding: 12px 16px; border-radius: 0 12px 12px 12px; border: 1px solid #eee; position: relative; flex-grow: 1; }
         .note-header { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 12px; color: var(--text-light); }
         
+        /* PRINT LOGO */
+        .print-only-logo { display: none; }
+
         /* Forms & Buttons */
         .note-input { width: 100%; border: 1px solid var(--border-color); border-radius: 4px; padding: 12px; font-family: inherit; font-size: 13px; resize: vertical; min-height: 80px; transition: 0.2s; }
         .note-input:focus { border-color: var(--brand-color); outline: none; box-shadow: 0 0 0 2px rgba(1, 118, 211, 0.1); }
         .btn-add { background: var(--brand-color); color: white; border: none; padding: 8px 16px; border-radius: 4px; font-size: 13px; font-weight: 600; cursor: pointer; margin-top: 10px; float: right; }
-        
         .header-actions { display: flex; gap: 10px; }
         .btn-action { text-decoration: none; background: white; border: 1px solid var(--border-color); color: var(--text-main); padding: 8px 16px; border-radius: 4px; font-weight: 600; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; transition: 0.2s; }
         .btn-action:hover { background: #f3f2f2; border-color: #ccc; }
@@ -145,7 +147,10 @@ function getInitials($name) {
             body, .main-content, .content-body { display: block !important; height: auto !important; background: white !important; padding: 0 !important; margin: 0 !important; }
             .col-left, .col-right { width: 100% !important; flex: none !important; margin-bottom: 20px; }
             .card { box-shadow: none !important; border: 1px solid #ccc !important; break-inside: avoid; }
-            .stepper { display: none; } /* Stepper hoeft niet op papier */
+            .stepper { display: none; }
+            
+            /* Logo tonen bij printen */
+            .print-only-logo { display: block !important; max-width: 150px; margin-bottom: 20px; }
         }
     </style>
 </head>
@@ -164,6 +169,10 @@ function getInitials($name) {
         
         <?php include __DIR__ . '/includes/header.php'; ?>
         
+        <div style="padding: 0 24px;">
+            <img src="https://i.imgur.com/qGySlgO.png" class="print-only-logo" alt="Logo">
+        </div>
+
         <div class="content-body">
             <div class="col-left">
                 
@@ -274,7 +283,15 @@ function getInitials($name) {
                         <span><span class="material-icons-outlined" style="vertical-align:middle; margin-right:8px;">psychology</span>Gedrag & Soft Skills</span>
                     </div>
                     <div class="card-body">
-                        <div class="detail-grid">
+                        
+                        <div style="margin-bottom: 20px;">
+                            <div class="label">Rijgedrag & Communicatie</div>
+                            <div class="value" style="background: #f9fafb; padding: 10px; border-radius: 4px; border: 1px solid #eee;">
+                                <?php echo nl2br(htmlspecialchars($form['driving_behavior'] ?: 'Geen opmerkingen.')); ?>
+                            </div>
+                        </div>
+
+                        <div class="detail-grid" style="margin-bottom: 20px;">
                             <div class="detail-item">
                                 <div class="label">Skills Rating</div>
                                 <div style="color: #f59e0b;">
@@ -291,13 +308,23 @@ function getInitials($name) {
                                 <div class="value">Niveau <strong><?php echo $form['proficiency_rating']; ?></strong> / 14</div>
                             </div>
                         </div>
-                        
-                        <div style="margin-top: 15px;">
-                            <div class="label">Waarschuwingen</div>
-                            <div class="value" style="color: #c53030; background: #fff5f5; padding: 10px; border-radius: 4px; border: 1px solid #fed7d7;">
-                                <?php echo nl2br(htmlspecialchars($form['warnings'] ?: 'Geen waarschuwingen geregistreerd.')); ?>
+
+                        <div class="detail-grid">
+                            <div class="detail-item">
+                                <div class="label">Complimenten</div>
+                                <div class="value" style="color: #065f46; background: #d1fae5; padding: 10px; border-radius: 4px; border: 1px solid #6ee7b7;">
+                                    <?php echo nl2br(htmlspecialchars($form['client_compliment'] ?: 'Geen complimenten geregistreerd.')); ?>
+                                </div>
+                            </div>
+
+                            <div class="detail-item">
+                                <div class="label">Waarschuwingen</div>
+                                <div class="value" style="color: #c53030; background: #fff5f5; padding: 10px; border-radius: 4px; border: 1px solid #fed7d7;">
+                                    <?php echo nl2br(htmlspecialchars($form['warnings'] ?: 'Geen waarschuwingen geregistreerd.')); ?>
+                                </div>
                             </div>
                         </div>
+
                     </div>
                 </div>
             </div>
