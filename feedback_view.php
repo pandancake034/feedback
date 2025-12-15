@@ -1,8 +1,8 @@
 <?php
 /**
  * FEEDBACK_VIEW.PHP
- * High-end versie: Visualisaties, Steppers en CSRF beveiliging.
- * Update: Inclusief Logo (print), Rijgedrag en Complimenten.
+ * High-end versie: Visualisaties, Steppers, CSRF beveiliging.
+ * Update: Inclusief Logo (print), Rijgedrag, Complimenten EN PROFIEL AVATAR.
  */
 
 require_once __DIR__ . '/config/config.php';
@@ -65,7 +65,11 @@ $page_title = "Dossier Inzien";
 function getInitials($name) {
     $parts = explode(' ', $name);
     $initials = '';
-    foreach($parts as $part) { $initials .= strtoupper(substr($part, 0, 1)); }
+    foreach($parts as $part) { 
+        if(strlen($part) > 0) {
+            $initials .= strtoupper(substr($part, 0, 1)); 
+        }
+    }
     return substr($initials, 0, 2);
 }
 ?>
@@ -97,6 +101,21 @@ function getInitials($name) {
         .card-header { padding: 16px 20px; background: #fff; border-bottom: 1px solid #f0f0f0; font-weight: 700; font-size: 15px; display: flex; justify-content: space-between; align-items: center; color: var(--brand-color); }
         .card-body { padding: 20px; }
 
+        /* HEADER & PROFILE AVATAR (NIEUW) */
+        .profile-header-container { display: flex; justify-content: space-between; align-items: flex-start; }
+        .profile-info { display: flex; gap: 16px; align-items: center; }
+        
+        .profile-avatar { 
+            width: 64px; height: 64px; 
+            background: linear-gradient(135deg, var(--brand-color), #014486); /* Mooie gradient */
+            color: white; 
+            border-radius: 50%; 
+            display: flex; align-items: center; justify-content: center; 
+            font-size: 24px; font-weight: 700; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1); 
+            border: 3px solid white;
+        }
+
         /* Details & Visuals */
         .detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
         .detail-item { margin-bottom: 8px; }
@@ -107,8 +126,8 @@ function getInitials($name) {
         .progress-wrapper { margin-top: 5px; }
         .progress-bg { height: 6px; background: #eee; border-radius: 3px; overflow: hidden; width: 100%; }
         .progress-fill { height: 100%; background: var(--brand-color); border-radius: 3px; transition: width 0.5s ease; }
-        .progress-fill.success { background: #10b981; } /* Groen */
-        .progress-fill.warning { background: #f59e0b; } /* Oranje */
+        .progress-fill.success { background: #10b981; } 
+        .progress-fill.warning { background: #f59e0b; } 
         .progress-text { font-size: 12px; font-weight: 700; float: right; margin-top: -18px; color: var(--text-main); }
 
         /* STEPPER */
@@ -151,6 +170,8 @@ function getInitials($name) {
             
             /* Logo tonen bij printen */
             .print-only-logo { display: block !important; max-width: 150px; margin-bottom: 20px; }
+            /* Verberg de grote avatar bij printen om inkt te besparen en het zakelijk te houden */
+            .profile-avatar { display: none; } 
         }
     </style>
 </head>
@@ -176,15 +197,21 @@ function getInitials($name) {
         <div class="content-body">
             <div class="col-left">
                 
-                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                    <div>
-                        <h1 style="margin: 0; font-size: 24px; color: var(--text-main);">
-                            <?php echo htmlspecialchars($form['driver_name']); ?>
-                        </h1>
-                        <span style="font-size: 13px; color: var(--text-light); display: block; margin-top: 4px;">
-                            ID: <?php echo htmlspecialchars($form['employee_id']); ?> • 
-                            Gesprek: <?php echo date('d-m-Y', strtotime($form['form_date'])); ?>
-                        </span>
+                <div class="profile-header-container">
+                    <div class="profile-info">
+                        <div class="profile-avatar no-print">
+                            <?php echo getInitials($form['driver_name']); ?>
+                        </div>
+                        
+                        <div>
+                            <h1 style="margin: 0; font-size: 24px; color: var(--text-main);">
+                                <?php echo htmlspecialchars($form['driver_name']); ?>
+                            </h1>
+                            <span style="font-size: 13px; color: var(--text-light); display: block; margin-top: 4px;">
+                                ID: <?php echo htmlspecialchars($form['employee_id']); ?> • 
+                                Gesprek: <?php echo date('d-m-Y', strtotime($form['form_date'])); ?>
+                            </span>
+                        </div>
                     </div>
                     
                     <div class="header-actions no-print">
