@@ -74,4 +74,11 @@ function verify_csrf() {
         die("Beveiligingsfout (CSRF): Sessie verlopen of ongeldig verzoek. Vernieuw de pagina.");
     }
 }
+
+// ... (Je bestaande code en CSRF functies) ...
+
+// Helper functies inladen
+require_once __DIR__ . '/../includes/helpers.php';
+
+?>
 ?>

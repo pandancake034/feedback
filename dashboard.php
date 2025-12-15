@@ -159,9 +159,7 @@ if (empty($recentActivities)): ?>
             <td><?php echo htmlspecialchars($row['creator_email']); ?></td>
             <td>
                 <div id="view-status-<?php echo $row['id']; ?>" class="view-mode">
-                    <span class="status-badge <?php echo ($row['status'] === 'open') ? 'bg-open' : 'bg-completed'; ?>">
-                        <?php echo ucfirst($row['status']); ?>
-                    </span>
+                   <?php echo format_status_badge($row['status']); ?>
                     <button class="icon-btn" onclick="toggleEdit('status', <?php echo $row['id']; ?>)"><span class="material-icons-outlined" style="font-size:14px;">edit</span></button>
                 </div>
                 <form method="POST" id="edit-status-<?php echo $row['id']; ?>" class="edit-mode">
@@ -178,14 +176,11 @@ if (empty($recentActivities)): ?>
             <td>
                 <div id="view-assign-<?php echo $row['id']; ?>" class="view-mode">
                     <?php 
-                        if (!empty($row['assigned_to_user_id'])) {
-                            $displayName = (!empty($row['assigned_first'])) 
-                                ? trim($row['assigned_first'] . ' ' . $row['assigned_last']) 
-                                : $row['assigned_email'];
-                        } else {
-                            $displayName = '<span style="color:#bbb;">--</span>';
-                        }
-                        echo $displayName;
+                       if (!empty($row['assigned_to_user_id'])) {
+    echo format_user_name($row['assigned_first'], $row['assigned_last'], $row['assigned_email']);
+} else {
+    echo '<span style="color:#bbb;">--</span>';
+}
                     ?>
                     <button class="icon-btn" onclick="toggleEdit('assign', <?php echo $row['id']; ?>)"><span class="material-icons-outlined" style="font-size:14px;">edit</span></button>
                 </div>
