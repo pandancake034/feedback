@@ -1,8 +1,7 @@
 <?php
 /**
  * FEEDBACK_VIEW.PHP
- * Leesweergave van een dossier + Afspraken/Notities systeem.
- * UPDATE: 'Te Laat' veld toegevoegd onder Prestaties.
+ * High-end versie: Visualisaties, Steppers en CSRF beveiliging.
  */
 
 require_once __DIR__ . '/config/config.php';
@@ -16,11 +15,17 @@ if (!$form_id) { header("Location: dashboard.php"); exit; }
 
 // --- 1. NOTITIE TOEVOEGEN (POST) ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['note_content'])) {
+    
+    // BEVEILIGING: CSRF Check
+    verify_csrf();
+
     try {
         $driver_id = $_POST['driver_id'];
         $stmt = $pdo->prepare("INSERT INTO notes (driver_id, user_id, content) VALUES (?, ?, ?)");
         $stmt->execute([$driver_id, $_SESSION['user_id'], $_POST['note_content']]);
-        header("Location: feedback_view.php?id=" . $form_id . "&msg=note_added");
+        
+        // Redirect met succes melding (wordt opgepikt door SweetAlert in footer)
+        header("Location: feedback_view.php?id=" . $form_id . "&msg=saved");
         exit;
     } catch (PDOException $e) {
         $error = "Kon notitie niet opslaan.";
@@ -40,7 +45,7 @@ try {
 
     if (!$form) die("Dossier niet gevonden.");
 
-    // B. Notities / Afspraken (QUERY AANGEPAST: voornaam en achternaam ophalen)
+    // B. Notities / Afspraken
     $stmtNotes = $pdo->prepare("SELECT n.*, u.email, u.first_name, u.last_name 
                                 FROM notes n 
                                 JOIN users u ON n.user_id = u.id 
@@ -53,142 +58,94 @@ try {
     die("Database fout: " . $e->getMessage());
 }
 
-// Variabele voor de header
 $page_title = "Dossier Inzien";
+
+// Helper functie voor initialen (alleen hier nodig voor de tijdlijn visuals)
+function getInitials($name) {
+    $parts = explode(' ', $name);
+    $initials = '';
+    foreach($parts as $part) { $initials .= strtoupper(substr($part, 0, 1)); }
+    return substr($initials, 0, 2);
+}
 ?>
 <!DOCTYPE html>
 <html lang="nl">
 <head>
     <meta charset="UTF-8">
-<title><?php echo APP_TITLE; ?></title>
+    <title><?php echo APP_TITLE; ?></title>
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
-        /* --- ENTERPRISE VIEW STYLE --- */
+        /* --- CORE THEME --- */
         :root { --brand-color: #0176d3; --bg-body: #f3f2f2; --text-main: #181818; --text-light: #706e6b; --border-color: #dddbda; }
         body { margin: 0; font-family: 'Segoe UI', sans-serif; background: var(--bg-body); color: var(--text-main); display: flex; height: 100vh; overflow: hidden; }
         * { box-sizing: border-box; }
 
-        /* Layout Main */
+        /* Layout */
         .sidebar { width: 240px; background: #1a2233; color: white; flex-shrink: 0; display: flex; flex-direction: column; }
         .main-content { flex-grow: 1; display: flex; flex-direction: column; overflow-y: auto; }
+        .top-header { height: 60px; background: white; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; padding: 0 24px; flex-shrink: 0; }
+        .content-body { padding: 24px; display: flex; gap: 24px; flex-grow: 1; max-width: 1600px; margin: 0 auto; width: 100%; }
         
-        /* Header CSS */
-        .top-header { 
-            height: 60px; 
-            background: white; 
-            border-bottom: 1px solid var(--border-color); 
-            display: flex; 
-            align-items: center; 
-            justify-content: space-between; 
-            padding: 0 24px; 
-            box-shadow: 0 2px 4px rgba(0,0,0,0.02); 
-            flex-shrink: 0;
-        }
-
-        /* Content Wrapper voor de 2 kolommen */
-        .content-body { padding: 24px; display: flex; gap: 24px; flex-grow: 1; }
-        
-        /* Kolommen */
-        .col-left { flex: 2; } /* Formulier info */
-        .col-right { flex: 1; min-width: 300px; } /* Notities */
+        /* Grid Columns */
+        .col-left { flex: 2; display: flex; flex-direction: column; gap: 24px; }
+        .col-right { flex: 1; min-width: 350px; }
 
         /* Cards */
-        .card { background: white; border: 1px solid var(--border-color); border-radius: 4px; box-shadow: 0 2px 2px rgba(0,0,0,0.1); margin-bottom: 24px; }
-        .card-header { padding: 12px 16px; background: #f8f9fa; border-bottom: 1px solid var(--border-color); font-weight: 700; font-size: 14px; display: flex; justify-content: space-between; align-items: center; }
+        .card { background: white; border: 1px solid var(--border-color); border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); overflow: hidden; }
+        .card-header { padding: 16px 20px; background: #fff; border-bottom: 1px solid #f0f0f0; font-weight: 700; font-size: 15px; display: flex; justify-content: space-between; align-items: center; color: var(--brand-color); }
         .card-body { padding: 20px; }
 
-        /* Detail Fields */
-        .detail-row { display: flex; border-bottom: 1px solid #eee; padding: 12px 0; }
-        .detail-row:last-child { border-bottom: none; }
-        .label { width: 140px; color: var(--text-light); font-size: 13px; font-weight: 600; flex-shrink: 0; }
-        .value { font-size: 14px; color: var(--text-main); line-height: 1.4; }
+        /* Details & Visuals */
+        .detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
+        .detail-item { margin-bottom: 8px; }
+        .label { font-size: 12px; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; margin-bottom: 4px; }
+        .value { font-size: 15px; color: var(--text-main); font-weight: 500; }
         
-        /* Scores Visuals */
-        .score-badge { display: inline-block; padding: 4px 8px; border-radius: 4px; background: #e0e7ff; color: #ca564eff; font-weight: 700; font-size: 13px; }
-        .score-badge.success { background: #d1fae5; color: #065f46; } 
+        /* PROGRESS BARS (NIEUW) */
+        .progress-wrapper { margin-top: 5px; }
+        .progress-bg { height: 6px; background: #eee; border-radius: 3px; overflow: hidden; width: 100%; }
+        .progress-fill { height: 100%; background: var(--brand-color); border-radius: 3px; transition: width 0.5s ease; }
+        .progress-fill.success { background: #10b981; } /* Groen */
+        .progress-fill.warning { background: #f59e0b; } /* Oranje */
+        .progress-text { font-size: 12px; font-weight: 700; float: right; margin-top: -18px; color: var(--text-main); }
+
+        /* STEPPER (NIEUW) */
+        .stepper { display: flex; align-items: center; margin-bottom: 24px; background: white; padding: 20px; border-radius: 6px; border: 1px solid var(--border-color); }
+        .step { flex: 1; position: relative; text-align: center; font-size: 13px; color: var(--text-light); font-weight: 600; }
+        .step::after { content: ''; position: absolute; top: 14px; left: 50%; width: 100%; height: 2px; background: #eee; z-index: 1; }
+        .step:last-child::after { display: none; }
+        .step-icon { width: 30px; height: 30px; background: #eee; color: #999; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 8px; position: relative; z-index: 2; font-size: 16px; transition: 0.3s; }
         
-        /* Timeline / Notes */
-        .timeline { margin-top: 15px; }
-        .timeline-item { padding-left: 15px; border-left: 2px solid #e0e0e0; padding-bottom: 20px; position: relative; }
-        .timeline-item::before { content: ''; position: absolute; left: -6px; top: 0; width: 10px; height: 10px; background: var(--brand-color); border-radius: 50%; }
-        .note-meta { font-size: 11px; color: var(--text-light); margin-bottom: 4px; }
-        .note-content { font-size: 13px; background: #f9f9f9; padding: 10px; border-radius: 4px; border: 1px solid #eee; }
+        .step.active .step-icon { background: var(--brand-color); color: white; box-shadow: 0 0 0 4px rgba(1, 118, 211, 0.2); }
+        .step.completed .step-icon { background: #10b981; color: white; }
+        .step.completed::after { background: #10b981; }
 
-        /* Input Area */
-        .note-input { width: 100%; border: 1px solid var(--border-color); border-radius: 4px; padding: 10px; font-family: inherit; font-size: 13px; resize: vertical; min-height: 80px; }
-        .btn-add { background: var(--brand-color); color: white; border: none; padding: 8px 16px; border-radius: 4px; font-size: 13px; font-weight: 600; cursor: pointer; margin-top: 8px; float: right; }
-
-        /* Header Actions & Buttons */
-        .page-header-actions { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
+        /* TIMELINE / CHAT (UPDATE) */
+        .timeline { margin-top: 10px; }
+        .timeline-item { display: flex; gap: 12px; margin-bottom: 20px; }
+        .avatar { width: 36px; height: 36px; background: #e0e7ff; color: var(--brand-color); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .note-bubble { background: #f9f9f9; padding: 12px 16px; border-radius: 0 12px 12px 12px; border: 1px solid #eee; position: relative; flex-grow: 1; }
+        .note-header { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 12px; color: var(--text-light); }
         
-        /* Button Styles */
-        .btn-action { text-decoration: none; border: 1px solid var(--border-color); background: white; color: var(--text-main); padding: 8px 16px; border-radius: 4px; font-weight: 600; font-size: 13px; display: inline-flex; align-items: center; gap: 5px; transition: 0.2s; cursor: pointer; }
-        .btn-action:hover { background-color: #f3f2f2; }
-        .btn-primary { background: white; color: var(--brand-color); border-color: var(--border-color); }
-        .btn-primary:hover { background: #f0f8ff; border-color: var(--brand-color); }
+        /* Forms & Buttons */
+        .note-input { width: 100%; border: 1px solid var(--border-color); border-radius: 4px; padding: 12px; font-family: inherit; font-size: 13px; resize: vertical; min-height: 80px; transition: 0.2s; }
+        .note-input:focus { border-color: var(--brand-color); outline: none; box-shadow: 0 0 0 2px rgba(1, 118, 211, 0.1); }
+        .btn-add { background: var(--brand-color); color: white; border: none; padding: 8px 16px; border-radius: 4px; font-size: 13px; font-weight: 600; cursor: pointer; margin-top: 10px; float: right; }
+        
+        .header-actions { display: flex; gap: 10px; }
+        .btn-action { text-decoration: none; background: white; border: 1px solid var(--border-color); color: var(--text-main); padding: 8px 16px; border-radius: 4px; font-weight: 600; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; transition: 0.2s; }
+        .btn-action:hover { background: #f3f2f2; border-color: #ccc; }
+        .btn-primary { background: var(--brand-color); color: white; border: none; }
+        .btn-primary:hover { background: #014486; }
 
-        /* NIEUWE STIJL VOOR DE TITEL */
-        .driver-title { margin: 0; font-size: 26px; font-weight: 300; color: var(--text-light); }
-        .driver-name { font-weight: 700; color: var(--text-main); }
-
-        /* PRINT LOGO STANDAARD VERBERGEN */
-        .print-only-logo { display: none; }
-
-        /* --- PRINT STYLES (PDF EXPORT) --- */
+        /* Print Styles */
         @media print {
-            /* Verberg elementen die niet op papier horen */
-            .sidebar, .top-header, .btn-action, .btn-add, .note-input, .app-footer, .no-print {
-                display: none !important;
-            }
-
-            /* LOGO ZICHTBAAR MAKEN BIJ PRINTEN */
-            .print-only-logo {
-                display: block !important;
-                max-width: 180px; 
-                margin-bottom: 20px;
-            }
-
-            /* Reset layout voor papier */
-            body, .main-content, .content-body {
-                display: block !important;
-                height: auto !important;
-                overflow: visible !important;
-                background: white !important;
-                margin: 0 !important;
-                padding: 0 !important;
-            }
-
-            .content-body { padding: 0 !important; }
-
-            /* Zorg dat de kolommen onder elkaar komen */
-            .col-left, .col-right {
-                width: 100% !important;
-                flex: none !important;
-                margin-bottom: 20px;
-            }
-
-            /* Maak kaarten strakker voor print */
-            .card {
-                box-shadow: none !important;
-                border: 1px solid #ccc !important;
-                break-inside: avoid; /* Voorkom dat kaarten middenin worden doorgeknipt */
-                margin-bottom: 15px !important;
-            }
-
-            .card-header {
-                background-color: #f0f0f0 !important;
-                border-bottom: 2px solid #ccc !important;
-                color: black !important;
-            }
-            
-            /* Lettertypes iets verkleinen/optimaliseren */
-            body { font-size: 12px; }
-            .driver-title { font-size: 20px; color: black !important; }
-            
-            /* Notities achtergrond wit maken */
-            .card-body[style*="background-color"] { background-color: white !important; }
-            .note-content { background: white !important; border: 1px solid #ddd; }
+            .sidebar, .top-header, .btn-action, .btn-add, .note-input, .no-print { display: none !important; }
+            body, .main-content, .content-body { display: block !important; height: auto !important; background: white !important; padding: 0 !important; margin: 0 !important; }
+            .col-left, .col-right { width: 100% !important; flex: none !important; margin-bottom: 20px; }
+            .card { box-shadow: none !important; border: 1px solid #ccc !important; break-inside: avoid; }
+            .stepper { display: none; } /* Stepper hoeft niet op papier */
         }
     </style>
 </head>
@@ -207,94 +164,138 @@ $page_title = "Dossier Inzien";
         
         <?php include __DIR__ . '/includes/header.php'; ?>
         
-        <img src="https://i.imgur.com/qGySlgO.png" class="print-only-logo" alt="Logo">
-        
         <div class="content-body">
             <div class="col-left">
                 
-                <div class="page-header-actions">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                     <div>
-                        <h1 class="driver-title">
-                            Driver Feedback: <span class="driver-name"><?php echo htmlspecialchars($form['driver_name']); ?></span>
+                        <h1 style="margin: 0; font-size: 24px; color: var(--text-main);">
+                            <?php echo htmlspecialchars($form['driver_name']); ?>
                         </h1>
                         <span style="font-size: 13px; color: var(--text-light); display: block; margin-top: 4px;">
-                            Gesprek van <?php echo date('d-m-Y', strtotime($form['form_date'])); ?> • ID: <?php echo htmlspecialchars($form['employee_id']); ?>
+                            ID: <?php echo htmlspecialchars($form['employee_id']); ?> • 
+                            Gesprek: <?php echo date('d-m-Y', strtotime($form['form_date'])); ?>
                         </span>
                     </div>
                     
-                    <div class="no-print" style="display:flex; gap:10px;">
+                    <div class="header-actions no-print">
                         <button onclick="window.print()" class="btn-action">
-                            <span class="material-icons-outlined" style="font-size: 18px;">print</span> Export PDF
+                            <span class="material-icons-outlined" style="font-size: 18px;">print</span> PDF
                         </button>
-                        
                         <a href="feedback_form.php?id=<?php echo $form_id; ?>" class="btn-action btn-primary">
-                            <span class="material-icons-outlined" style="font-size: 16px;">edit</span> Bewerken
+                            <span class="material-icons-outlined" style="font-size: 18px;">edit</span> Bewerken
                         </a>
                     </div>
                 </div>
 
+                <?php 
+                    $isCompleted = ($form['status'] === 'completed');
+                    $openClass = $isCompleted ? 'completed' : 'active';
+                    $doneClass = $isCompleted ? 'active' : '';
+                ?>
+                <div class="stepper no-print">
+                    <div class="step <?php echo $openClass; ?>">
+                        <div class="step-icon"><span class="material-icons-outlined" style="font-size:16px;">edit_note</span></div>
+                        Concept / Open
+                    </div>
+                    <div class="step <?php echo $openClass; ?>">
+                        <div class="step-icon"><span class="material-icons-outlined" style="font-size:16px;">rate_review</span></div>
+                        Beoordeling
+                    </div>
+                    <div class="step <?php echo $doneClass; ?>">
+                        <div class="step-icon"><span class="material-icons-outlined" style="font-size:16px;">check_circle</span></div>
+                        Afgerond
+                    </div>
+                </div>
+
                 <div class="card">
-                    <div class="card-header">1. Prestaties & Scores</div>
+                    <div class="card-header">
+                        <span><span class="material-icons-outlined" style="vertical-align:middle; margin-right:8px;">insights</span>Prestaties</span>
+                    </div>
                     <div class="card-body">
-                        <div class="detail-row">
-                            <div class="label">OTD score:</div>
-                            <div class="value">
+                        <div class="detail-grid">
+                            
+                            <div class="detail-item">
+                                <div class="label">OTD Score</div>
                                 <?php 
-                                    $otdVal = floatval($form['otd_score']);
-                                    $otdClass = ($otdVal > 96) ? 'score-badge success' : 'score-badge';
+                                    $otdVal = floatval(str_replace('%', '', $form['otd_score']));
+                                    $otdColor = ($otdVal >= 96) ? 'success' : 'warning';
                                 ?>
-                                <span class="<?php echo $otdClass; ?>"><?php echo htmlspecialchars($form['otd_score'] ?: '-'); ?></span>
+                                <div class="progress-wrapper">
+                                    <div class="progress-text"><?php echo htmlspecialchars($form['otd_score']); ?></div>
+                                    <div class="progress-bg">
+                                        <div class="progress-fill <?php echo $otdColor; ?>" style="width: <?php echo $otdVal; ?>%;"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="detail-item">
+                                <div class="label">FTR Score</div>
+                                <?php 
+                                    $ftrVal = floatval(str_replace('%', '', $form['ftr_score']));
+                                    $ftrColor = ($ftrVal >= 96) ? 'success' : 'warning';
+                                ?>
+                                <div class="progress-wrapper">
+                                    <div class="progress-text"><?php echo htmlspecialchars($form['ftr_score']); ?></div>
+                                    <div class="progress-bg">
+                                        <div class="progress-fill <?php echo $ftrColor; ?>" style="width: <?php echo $ftrVal; ?>%;"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="detail-item">
+                                <div class="label">KW Verbruik</div>
+                                <div class="value" style="font-size: 18px;"><?php echo htmlspecialchars($form['kw_score'] ?: '-'); ?></div>
+                            </div>
+
+                            <div class="detail-item">
+                                <div class="label">Aantal Routes</div>
+                                <div class="value" style="font-size: 18px;"><?php echo htmlspecialchars($form['routes_count']); ?></div>
                             </div>
                         </div>
-                        <div class="detail-row">
-                            <div class="label">FTR score:</div>
-                            <div class="value">
-                                <?php 
-                                    $ftrVal = floatval($form['ftr_score']);
-                                    $ftrClass = ($ftrVal > 96) ? 'score-badge success' : 'score-badge';
-                                ?>
-                                <span class="<?php echo $ftrClass; ?>"><?php echo htmlspecialchars($form['ftr_score'] ?: '-'); ?></span>
+
+                        <hr style="border:0; border-top:1px solid #eee; margin: 20px 0;">
+
+                        <div class="detail-grid">
+                            <div class="detail-item">
+                                <div class="label">Fouten (Errors)</div>
+                                <div class="value"><?php echo nl2br(htmlspecialchars($form['errors_text'] ?: 'Geen')); ?></div>
                             </div>
-                        </div>
-                        <div class="detail-row">
-                            <div class="label">KW verbruik E-vito:</div>
-                            <div class="value"><?php echo htmlspecialchars($form['kw_score'] ?: '-'); ?></div>
-                        </div>
-                        <div class="detail-row">
-                            <div class="label">Aantal routes:</div>
-                            <div class="value"><?php echo htmlspecialchars($form['routes_count']); ?></div>
-                        </div>
-                        <div class="detail-row">
-                            <div class="label">Fouten (errors):</div>
-                            <div class="value"><?php echo nl2br(htmlspecialchars($form['errors_text'] ?: 'Geen bijzonderheden')); ?></div>
-                        </div>
-                        <div class="detail-row">
-                            <div class="label">Te laat:</div>
-                            <div class="value"><?php echo nl2br(htmlspecialchars($form['late_text'] ?: 'Geen bijzonderheden')); ?></div>
+                            <div class="detail-item">
+                                <div class="label">Te Laat</div>
+                                <div class="value"><?php echo nl2br(htmlspecialchars($form['late_text'] ?: 'Geen')); ?></div>
+                            </div>
                         </div>
                     </div>
                 </div>
 
                 <div class="card">
-                    <div class="card-header">2. Gedrag & Beoordeling</div>
+                    <div class="card-header">
+                        <span><span class="material-icons-outlined" style="vertical-align:middle; margin-right:8px;">psychology</span>Gedrag & Soft Skills</span>
+                    </div>
                     <div class="card-body">
-                        <div class="detail-row">
-                            <div class="label">Rijgedrag:</div>
-                            <div class="value"><?php echo nl2br(htmlspecialchars($form['driving_behavior'] ?: '-')); ?></div>
+                        <div class="detail-grid">
+                            <div class="detail-item">
+                                <div class="label">Skills Rating</div>
+                                <div style="color: #f59e0b;">
+                                    <?php 
+                                        $stars = intval($form['skills_rating']);
+                                        for($i=0; $i<5; $i++) {
+                                            echo ($i < $stars) ? '<span class="material-icons-outlined" style="font-size:18px;">star</span>' : '<span class="material-icons-outlined" style="font-size:18px; color:#ddd;">star_border</span>';
+                                        }
+                                    ?>
+                                </div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="label">Proficiency Level</div>
+                                <div class="value">Niveau <strong><?php echo $form['proficiency_rating']; ?></strong> / 14</div>
+                            </div>
                         </div>
-                        <div class="detail-row">
-                            <div class="label">Waarschuwingen:</div>
-                            <div class="value" style="color: #c53030;"><?php echo nl2br(htmlspecialchars($form['warnings'] ?: 'Geen')); ?></div>
-                        </div>
-                        <div class="detail-row">
-                            <div class="label">Complimenten</div>
-                            <div class="value" style="color: #047857;"><?php echo nl2br(htmlspecialchars($form['client_compliment'] ?: '-')); ?></div>
-                        </div>
-                        <div class="detail-row">
-                            <div class="label">Beoordeling</div>
-                            <div class="value">
-                                Vaardigheden: <strong><?php echo $form['skills_rating']; ?>/5</strong> • 
-                                Proficiency level: <strong><?php echo $form['proficiency_rating']; ?>/5</strong>
+                        
+                        <div style="margin-top: 15px;">
+                            <div class="label">Waarschuwingen</div>
+                            <div class="value" style="color: #c53030; background: #fff5f5; padding: 10px; border-radius: 4px; border: 1px solid #fed7d7;">
+                                <?php echo nl2br(htmlspecialchars($form['warnings'] ?: 'Geen waarschuwingen geregistreerd.')); ?>
                             </div>
                         </div>
                     </div>
@@ -304,41 +305,36 @@ $page_title = "Dossier Inzien";
             <div class="col-right">
                 <div class="card">
                     <div class="card-header">
-                        <span style="display:flex; align-items:center; gap:8px;">
-                            <span class="material-icons-outlined">history_edu</span> Afspraken & Notities
-                        </span>
+                        <span><span class="material-icons-outlined" style="vertical-align:middle; margin-right:8px;">forum</span>Tijdlijn & Notities</span>
                     </div>
-                    <div class="card-body" style="background-color: #fcfcfc;">
+                    <div class="card-body" style="background-color: #fcfcfc; max-height: 600px; overflow-y: auto;">
                         
-                        <form method="POST" style="margin-bottom: 20px;" class="no-print">
+                        <form method="POST" style="margin-bottom: 24px;" class="no-print">
+                            <?php echo csrf_field(); ?>
                             <input type="hidden" name="driver_id" value="<?php echo $form['driver_id']; ?>">
-                            <textarea name="note_content" class="note-input" placeholder="Nieuwe afspraak of notitie toevoegen..." required></textarea>
-                            <button type="submit" class="btn-add">Toevoegen</button>
+                            <textarea name="note_content" class="note-input" placeholder="Schrijf een notitie of afspraak..." required></textarea>
+                            <button type="submit" class="btn-add">Plaatsen</button>
                             <div style="clear:both;"></div>
                         </form>
 
-                        <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" class="no-print">
-
                         <div class="timeline">
                             <?php if(empty($notes)): ?>
-                                <div style="font-size: 13px; color: #999; text-align: center;">Nog geen afspraken genoteerd.</div>
+                                <div style="text-align: center; color: #999; padding: 20px; font-style: italic;">Nog geen notities.</div>
                             <?php else: ?>
-                                <?php foreach($notes as $note): ?>
+                                <?php foreach($notes as $note): 
+                                    $displayName = (!empty($note['first_name'])) ? $note['first_name'] . ' ' . $note['last_name'] : $note['email'];
+                                    $initials = getInitials($displayName);
+                                ?>
                                 <div class="timeline-item">
-                                    <div class="note-meta">
-                                        <strong>
-                                            <?php 
-                                                // Als voornaam en achternaam bestaan, gebruik die. Anders fallback naar email.
-                                                $authorName = (!empty($note['first_name']) || !empty($note['last_name'])) 
-                                                    ? trim($note['first_name'] . ' ' . $note['last_name']) 
-                                                    : $note['email'];
-                                                echo htmlspecialchars($authorName); 
-                                            ?>
-                                        </strong> • 
-                                        <?php echo date('d-m-Y H:i', strtotime($note['note_date'])); ?>
-                                    </div>
-                                    <div class="note-content">
-                                        <?php echo nl2br(htmlspecialchars($note['content'])); ?>
+                                    <div class="avatar"><?php echo $initials; ?></div>
+                                    <div class="note-bubble">
+                                        <div class="note-header">
+                                            <strong><?php echo htmlspecialchars($displayName); ?></strong>
+                                            <span><?php echo date('d-m-Y H:i', strtotime($note['note_date'])); ?></span>
+                                        </div>
+                                        <div style="font-size: 13px; color: var(--text-main); line-height: 1.5;">
+                                            <?php echo nl2br(htmlspecialchars($note['content'])); ?>
+                                        </div>
                                     </div>
                                 </div>
                                 <?php endforeach; ?>
