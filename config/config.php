@@ -79,6 +79,4 @@ function verify_csrf() {
 
 // Helper functies inladen
 require_once __DIR__ . '/../includes/helpers.php';
-
-?>
 ?>
