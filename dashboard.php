@@ -351,10 +351,6 @@ if (isset($_GET['ajax_pagination'])) {
 
         <div class="page-body">
 
-            <?php if ($msg): ?>
-                <div class="alert-toast"><span class="material-icons-outlined">info</span> Update: <?php echo htmlspecialchars($msg); ?></div>
-            <?php endif; ?>
-
             <<div class="grid-row">
     <div class="card">
         <div class="card-body">
