@@ -2,7 +2,7 @@
 /**
  * FEEDBACK_VIEW.PHP
  * High-end versie: Visualisaties, Steppers, CSRF, Avatar.
- * Update: Notities Bewerken en Verwijderen toegevoegd.
+ * Update: CHAT LAYOUT (WhatsApp style) voor notities.
  */
 
 require_once __DIR__ . '/config/config.php';
@@ -17,7 +17,7 @@ if (!$form_id) { header("Location: dashboard.php"); exit; }
 // --- 1. ACTIES VERWERKEN (POST) ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
-    // BEVEILIGING: CSRF Check voor alle acties
+    // BEVEILIGING: CSRF Check
     verify_csrf();
 
     // A. NIEUWE NOTITIE
@@ -32,7 +32,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // B. NOTITIE BEWERKEN
     if (isset($_POST['action']) && $_POST['action'] === 'edit_note') {
         try {
-            // Check eigenaarschap (of admin)
             $check = $pdo->prepare("SELECT user_id FROM notes WHERE id = ?");
             $check->execute([$_POST['note_id']]);
             $noteOwner = $check->fetchColumn();
@@ -48,7 +47,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // C. NOTITIE VERWIJDEREN
     if (isset($_POST['action']) && $_POST['action'] === 'delete_note') {
         try {
-            // Check eigenaarschap (of admin)
             $check = $pdo->prepare("SELECT user_id FROM notes WHERE id = ?");
             $check->execute([$_POST['note_id']]);
             $noteOwner = $check->fetchColumn();
@@ -64,7 +62,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // --- 2. DATA OPHALEN ---
 try {
-    // Formulier Data
     $stmt = $pdo->prepare("SELECT f.*, d.name as driver_name, d.employee_id, u.email as creator_email 
                            FROM feedback_forms f 
                            JOIN drivers d ON f.driver_id = d.id 
@@ -75,12 +72,20 @@ try {
 
     if (!$form) die("Dossier niet gevonden.");
 
-    // Notities
+    // Notities ophalen
     $stmtNotes = $pdo->prepare("SELECT n.*, u.id as user_id, u.email, u.first_name, u.last_name 
                                 FROM notes n 
                                 JOIN users u ON n.user_id = u.id 
                                 WHERE n.driver_id = ? 
-                                ORDER BY n.note_date DESC");
+                                ORDER BY n.note_date ASC"); // LET OP: ASC voor Chat volgorde (oud naar nieuw) of DESC voor nieuwste boven.
+                                // Voor echte chat is ASC (oudste boven, nieuwste onder) logischer, maar bij dossiers vaak nieuwste boven.
+                                // Ik laat hem op DESC staan (nieuwste boven) omdat dat handig is bij dossiers. 
+                                // Wil je het andersom (onderaan typen)? Verander dan naar ASC.
+    $stmtNotes = $pdo->prepare("SELECT n.*, u.id as user_id, u.email, u.first_name, u.last_name 
+                                FROM notes n 
+                                JOIN users u ON n.user_id = u.id 
+                                WHERE n.driver_id = ? 
+                                ORDER BY n.note_date DESC"); 
     $stmtNotes->execute([$form['driver_id']]);
     $notes = $stmtNotes->fetchAll(PDO::FETCH_ASSOC);
 
@@ -106,7 +111,7 @@ function getInitials($name) {
     <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         /* --- CORE THEME --- */
-        :root { --brand-color: #0176d3; --bg-body: #f3f2f2; --text-main: #181818; --text-light: #706e6b; --border-color: #dddbda; }
+        :root { --brand-color: #0176d3; --brand-dark: #014486; --bg-body: #f3f2f2; --text-main: #181818; --text-light: #706e6b; --border-color: #dddbda; }
         body { margin: 0; font-family: 'Segoe UI', sans-serif; background: var(--bg-body); color: var(--text-main); display: flex; height: 100vh; overflow: hidden; }
         * { box-sizing: border-box; }
 
@@ -117,7 +122,7 @@ function getInitials($name) {
         .content-body { padding: 24px; display: flex; gap: 24px; flex-grow: 1; max-width: 1600px; margin: 0 auto; width: 100%; }
         
         .col-left { flex: 2; display: flex; flex-direction: column; gap: 24px; }
-        .col-right { flex: 1; min-width: 350px; }
+        .col-right { flex: 1; min-width: 400px; /* Iets breder voor chat */ }
 
         .card { background: white; border: 1px solid var(--border-color); border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); overflow: hidden; }
         .card-header { padding: 16px 20px; background: #fff; border-bottom: 1px solid #f0f0f0; font-weight: 700; font-size: 15px; display: flex; justify-content: space-between; align-items: center; color: var(--brand-color); }
@@ -132,19 +137,18 @@ function getInitials($name) {
             font-size: 24px; font-weight: 700; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border: 3px solid white;
         }
 
-        /* DETAILS */
+        /* DETAILS & PROGRESS */
         .detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
         .detail-item { margin-bottom: 8px; }
         .label { font-size: 12px; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; margin-bottom: 4px; }
         .value { font-size: 15px; color: var(--text-main); font-weight: 500; line-height: 1.5; }
-        
-        /* VISUALS */
         .progress-wrapper { margin-top: 5px; }
         .progress-bg { height: 6px; background: #eee; border-radius: 3px; overflow: hidden; width: 100%; }
         .progress-fill { height: 100%; background: var(--brand-color); border-radius: 3px; transition: width 0.5s ease; }
         .progress-fill.success { background: #10b981; } .progress-fill.warning { background: #f59e0b; } 
         .progress-text { font-size: 12px; font-weight: 700; float: right; margin-top: -18px; color: var(--text-main); }
 
+        /* STEPPER */
         .stepper { display: flex; align-items: center; margin-bottom: 24px; background: white; padding: 20px; border-radius: 6px; border: 1px solid var(--border-color); }
         .step { flex: 1; position: relative; text-align: center; font-size: 13px; color: var(--text-light); font-weight: 600; }
         .step::after { content: ''; position: absolute; top: 14px; left: 50%; width: 100%; height: 2px; background: #eee; z-index: 1; }
@@ -154,19 +158,75 @@ function getInitials($name) {
         .step.completed .step-icon { background: #10b981; color: white; }
         .step.completed::after { background: #10b981; }
 
-        /* TIMELINE */
-        .timeline { margin-top: 10px; }
-        .timeline-item { display: flex; gap: 12px; margin-bottom: 20px; }
-        .avatar { width: 36px; height: 36px; background: #e0e7ff; color: var(--brand-color); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .note-bubble { background: #f9f9f9; padding: 12px 16px; border-radius: 0 12px 12px 12px; border: 1px solid #eee; position: relative; flex-grow: 1; }
-        .note-header { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 12px; color: var(--text-light); align-items: center; }
+        /* --- CHAT STYLES (NIEUW) --- */
+        .chat-container { display: flex; flex-direction: column; gap: 15px; padding-bottom: 20px; }
         
-        /* Note Actions (Edit/Delete) */
-        .note-actions { display: flex; gap: 6px; opacity: 0.6; transition: 0.2s; }
-        .note-bubble:hover .note-actions { opacity: 1; }
-        .action-icon { cursor: pointer; font-size: 14px; color: #999; padding: 2px; }
-        .action-icon:hover { color: var(--brand-color); }
-        .action-icon.delete:hover { color: #c53030; }
+        /* De rij die het bericht bevat */
+        .chat-row { display: flex; align-items: flex-end; gap: 10px; width: 100%; }
+        
+        /* MIJN bericht (Rechts) */
+        .chat-row.me { justify-content: flex-end; }
+        
+        /* COLLEGA bericht (Links) */
+        .chat-row.other { justify-content: flex-start; }
+
+        /* Avatar in chat */
+        .chat-avatar {
+            width: 32px; height: 32px; flex-shrink: 0;
+            background: #e0e7ff; color: var(--brand-color);
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            font-size: 11px; font-weight: 700;
+            border: 1px solid white; box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        }
+        /* Avatar voor mijzelf mag iets anders kleuren */
+        .chat-row.me .chat-avatar { background: var(--brand-dark); color: white; }
+
+        /* De bubbel zelf */
+        .chat-bubble {
+            max-width: 80%;
+            padding: 10px 14px;
+            position: relative;
+            font-size: 13px;
+            line-height: 1.4;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+
+        /* Styling voor MIJ (Blauw) */
+        .chat-row.me .chat-bubble {
+            background-color: var(--brand-color);
+            color: white;
+            border-radius: 12px 12px 0 12px; /* Linksonder scherp */
+        }
+        
+        /* Styling voor ANDER (Grijs) */
+        .chat-row.other .chat-bubble {
+            background-color: #f3f4f6; /* Lichtgrijs */
+            color: var(--text-main);
+            border: 1px solid #eee;
+            border-radius: 12px 12px 12px 0; /* Rechtsonder scherp */
+        }
+
+        /* Header in de bubbel (Naam + Datum) */
+        .chat-meta {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 4px; font-size: 11px; gap: 10px;
+        }
+        .chat-row.me .chat-meta { color: rgba(255,255,255, 0.8); }
+        .chat-row.other .chat-meta { color: #999; }
+        .chat-name { font-weight: 700; }
+
+        /* Acties (Edit/Delete) */
+        .chat-actions { display: inline-flex; gap: 5px; opacity: 0; transition: 0.2s; margin-left: 8px; }
+        .chat-bubble:hover .chat-actions { opacity: 1; }
+        .chat-action-icon { cursor: pointer; font-size: 14px; }
+        
+        .chat-row.me .chat-action-icon { color: rgba(255,255,255, 0.9); }
+        .chat-row.me .chat-action-icon:hover { color: white; font-weight: bold; }
+        
+        .chat-row.other .chat-action-icon { color: #999; }
+        .chat-row.other .chat-action-icon:hover { color: var(--brand-color); }
+        .chat-row.other .chat-action-icon.delete:hover { color: #c53030; }
+
 
         /* Forms & Buttons */
         .note-input { width: 100%; border: 1px solid var(--border-color); border-radius: 4px; padding: 12px; font-family: inherit; font-size: 13px; resize: vertical; min-height: 80px; transition: 0.2s; }
@@ -178,7 +238,7 @@ function getInitials($name) {
         .btn-primary { background: var(--brand-color); color: white; border: none; }
         .btn-primary:hover { background: #014486; }
 
-        /* Modal Styles (voor Edit Note) */
+        /* Modal Styles */
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; display: none; align-items: center; justify-content: center; backdrop-filter: blur(2px); }
         .modal { background: white; width: 100%; max-width: 500px; border-radius: 6px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
         .modal-header { padding: 16px 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; font-weight: 700; background: #f8f9fa; }
@@ -188,13 +248,16 @@ function getInitials($name) {
         /* Print */
         .print-only-logo { display: none; }
         @media print {
-            .sidebar, .top-header, .btn-action, .btn-add, .note-input, .no-print, .note-actions { display: none !important; }
+            .sidebar, .top-header, .btn-action, .btn-add, .note-input, .no-print, .chat-actions { display: none !important; }
             body, .main-content, .content-body { display: block !important; height: auto !important; background: white !important; padding: 0 !important; margin: 0 !important; }
             .col-left, .col-right { width: 100% !important; flex: none !important; margin-bottom: 20px; }
             .card { box-shadow: none !important; border: 1px solid #ccc !important; break-inside: avoid; }
             .stepper { display: none; }
             .print-only-logo { display: block !important; max-width: 150px; margin-bottom: 20px; }
             .profile-avatar { display: none; } 
+            .chat-container { display: block; }
+            .chat-row { display: block; margin-bottom: 10px; }
+            .chat-bubble { max-width: 100%; background: white !important; color: black !important; border: 1px solid #ccc !important; }
         }
     </style>
 </head>
@@ -334,48 +397,67 @@ function getInitials($name) {
                             <?php echo csrf_field(); ?>
                             <input type="hidden" name="action" value="add_note">
                             <input type="hidden" name="driver_id" value="<?php echo $form['driver_id']; ?>">
-                            <textarea name="note_content" class="note-input" placeholder="Schrijf een notitie of afspraak..." required></textarea>
-                            <button type="submit" class="btn-add">Plaatsen</button>
+                            <textarea name="note_content" class="note-input" placeholder="Schrijf een bericht..." required></textarea>
+                            <button type="submit" class="btn-add">Versturen</button>
                             <div style="clear:both;"></div>
                         </form>
 
-                        <div class="timeline">
+                        <div class="chat-container">
                             <?php if(empty($notes)): ?>
-                                <div style="text-align: center; color: #999; padding: 20px; font-style: italic;">Nog geen notities.</div>
+                                <div style="text-align: center; color: #999; padding: 20px; font-style: italic;">Nog geen berichten.</div>
                             <?php else: ?>
                                 <?php foreach($notes as $note): 
                                     $displayName = (!empty($note['first_name'])) ? $note['first_name'] . ' ' . $note['last_name'] : $note['email'];
                                     $initials = getInitials($displayName);
-                                    // Check of huidige gebruiker de auteur is (of admin)
-                                    $isAuthor = ($note['user_id'] == $_SESSION['user_id'] || (isset($_SESSION['role']) && $_SESSION['role'] === 'admin'));
+                                    
+                                    // Bepaal of IK het ben (voor layout rechts)
+                                    $isMe = ($note['user_id'] == $_SESSION['user_id']);
+                                    
+                                    // Check eigenaarschap voor edits (of admin)
+                                    $canEdit = ($isMe || (isset($_SESSION['role']) && $_SESSION['role'] === 'admin'));
+                                    
+                                    // CSS Classes op basis van 'me' of 'other'
+                                    $rowClass = $isMe ? 'me' : 'other';
                                 ?>
-                                <div class="timeline-item">
-                                    <div class="avatar"><?php echo $initials; ?></div>
-                                    <div class="note-bubble">
-                                        <div class="note-header">
-                                            <div>
-                                                <strong><?php echo htmlspecialchars($displayName); ?></strong>
-                                                <span style="margin-left:8px; font-size:11px;"><?php echo date('d-m-Y H:i', strtotime($note['note_date'])); ?></span>
-                                            </div>
+                                <div class="chat-row <?php echo $rowClass; ?>">
+                                    
+                                    <?php if(!$isMe): ?>
+                                        <div class="chat-avatar" title="<?php echo htmlspecialchars($displayName); ?>">
+                                            <?php echo $initials; ?>
+                                        </div>
+                                    <?php endif; ?>
+
+                                    <div class="chat-bubble">
+                                        <div class="chat-meta">
+                                            <span class="chat-name"><?php echo htmlspecialchars($isMe ? 'Ik' : $displayName); ?></span>
+                                            <span><?php echo date('d-m-Y H:i', strtotime($note['note_date'])); ?></span>
                                             
-                                            <?php if ($isAuthor): ?>
-                                            <div class="note-actions">
-                                                <span class="material-icons-outlined action-icon" onclick="openEditNote(<?php echo $note['id']; ?>, '<?php echo addslashes(str_replace(["\r", "\n"], ['','\n'], $note['content'])); ?>')">edit</span>
-                                                <form method="POST" style="display:inline;" onsubmit="return confirm('Notitie verwijderen?');">
+                                            <?php if ($canEdit): ?>
+                                            <span class="chat-actions">
+                                                <span class="material-icons-outlined chat-action-icon" onclick="openEditNote(<?php echo $note['id']; ?>, '<?php echo addslashes(str_replace(["\r", "\n"], ['','\n'], $note['content'])); ?>')">edit</span>
+                                                <form method="POST" style="display:inline;" onsubmit="return confirm('Bericht verwijderen?');">
                                                     <?php echo csrf_field(); ?>
                                                     <input type="hidden" name="action" value="delete_note">
                                                     <input type="hidden" name="note_id" value="<?php echo $note['id']; ?>">
                                                     <button type="submit" style="background:none; border:none; padding:0; cursor:pointer;">
-                                                        <span class="material-icons-outlined action-icon delete">delete</span>
+                                                        <span class="material-icons-outlined chat-action-icon delete">delete</span>
                                                     </button>
                                                 </form>
-                                            </div>
+                                            </span>
                                             <?php endif; ?>
                                         </div>
-                                        <div style="font-size: 13px; color: var(--text-main); line-height: 1.5;">
+                                        
+                                        <div>
                                             <?php echo nl2br(htmlspecialchars($note['content'])); ?>
                                         </div>
                                     </div>
+
+                                    <?php if($isMe): ?>
+                                        <div class="chat-avatar">
+                                            <?php echo $initials; ?>
+                                        </div>
+                                    <?php endif; ?>
+
                                 </div>
                                 <?php endforeach; ?>
                             <?php endif; ?>
@@ -398,7 +480,7 @@ function getInitials($name) {
                 <input type="hidden" name="note_id" id="edit_note_id">
                 
                 <div class="modal-header">
-                    <span>Notitie Bewerken</span>
+                    <span>Bericht Bewerken</span>
                     <button type="button" onclick="closeEditNote()" style="background:none; border:none; cursor:pointer; font-size:20px;">&times;</button>
                 </div>
                 <div class="modal-body">
@@ -419,7 +501,7 @@ function getInitials($name) {
 
         function openEditNote(id, content) {
             editInputId.value = id;
-            editInputContent.value = content; // Newlines worden door PHP goed doorgegeven
+            editInputContent.value = content; 
             editModal.style.display = 'flex';
         }
 
@@ -427,9 +509,15 @@ function getInitials($name) {
             editModal.style.display = 'none';
         }
 
-        // Sluit modal als je ernaast klikt
         editModal.addEventListener('click', (e) => {
             if (e.target === editModal) closeEditNote();
+        });
+        
+        // Auto scroll naar beneden bij laden van pagina (handig voor chat)
+        document.addEventListener("DOMContentLoaded", function() {
+            var container = document.querySelector('.card-body[style*="overflow-y: auto"]');
+            if(container) container.scrollTop = 0; // Dossiers lees je vaak van boven naar beneden, dus 0 is beter.
+            // Als je liever naar beneden springt (zoals whatsapp): container.scrollTop = container.scrollHeight;
         });
     </script>
 
