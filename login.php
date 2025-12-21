@@ -140,7 +140,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
                 <div class="input-group">
                     <label for="email">E-mailadres</label>
-                    <input type="email" id="email" name="email" placeholder="naam@bedrijf.nl" required value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>">
+                    <input type="email" id="email" name="email" placeholder="naam@hellofresh.nl" required value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>">
                 </div>
 
                 <div class="input-group">
