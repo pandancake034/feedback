@@ -251,7 +251,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                 <label>Beoordelingsmoment:</label>
                                 <select name="review_moment">
                                     <option value="">-- Kies --</option>
-                                    <option value="8 weken" <?php if($data['review_moment'] == '8 weken') echo 'selected'; ?>>8 weken</option>
+                                    <option value="8 ritten" <?php if($data['review_moment'] == '8 weken') echo 'selected'; ?>>8 weken</option>
                                     <option value="26 weken" <?php if($data['review_moment'] == '26 weken') echo 'selected'; ?>>26 weken</option>
                                     <option value="52 weken" <?php if($data['review_moment'] == '52 weken') echo 'selected'; ?>>52 weken</option>
                                 </select>
