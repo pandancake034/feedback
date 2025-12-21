@@ -346,7 +346,7 @@ if (isset($_GET['ajax_pagination'])) {
 
         <div class="page-body">
 
-            <<div class="grid-row">
+            <div class="grid-row">
     <div class="card">
         <div class="card-body">
             <div class="kpi-value"><?php echo $stats['drivers']; ?></div>
