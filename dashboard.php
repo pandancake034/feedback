@@ -103,9 +103,10 @@ $totalPages = ceil($totalRows / $limit);
 if ($page > $totalPages && $totalPages > 0) { $page = $totalPages; }
 $offset = ($page - 1) * $limit;
 
+// --- AANPASSING 1: d.id as driver_id toegevoegd ---
 $sqlFields = "SELECT 
             f.id, f.form_date, f.review_moment, f.status, f.assigned_to_user_id, f.created_at,
-            d.name as driver_name, d.employee_id,
+            d.id as driver_id, d.name as driver_name, d.employee_id,
             u_creator.email as creator_email, 
             u_assigned.email as assigned_email,
             u_assigned.first_name as assigned_first,
@@ -135,7 +136,6 @@ if (empty($recentActivities)): ?>
         // Dit is voor het uitroepteken icoontje (als het dossier lang open staat na aanmaak)
         $isOverdue = ($row['status'] === 'open' && $interval->days > 14);
 
-        // --- AANPASSING HIER ---
         // Check of de planningsdatum (form_date) in het verleden ligt
         $isDateExpired = ($row['form_date'] < date('Y-m-d'));
 
@@ -150,7 +150,7 @@ if (empty($recentActivities)): ?>
                 <?php endif; ?>
             </td>
             <td>
-                <a href="feedback_view.php?id=<?php echo $row['id']; ?>" style="color:var(--brand-color); text-decoration:none; font-weight:700;">
+                <a href="driver_history.php?driver_id=<?php echo $row['driver_id']; ?>" style="color:var(--brand-color); text-decoration:none; font-weight:700;">
                     <?php echo htmlspecialchars($row['driver_name']); ?>
                 </a>
                 <div style="font-size:11px; color:#999;"><?php echo htmlspecialchars($row['employee_id'] ?? ''); ?></div>
