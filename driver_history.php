@@ -2,7 +2,7 @@
 /**
  * DRIVER_HISTORY.PHP
  * Overzicht van alle gesprekken van één specifieke chauffeur.
- * Update: Skills weergave aangepast.
+ * Update: Skills verwijderd, Errors toegevoegd in overzicht.
  */
 
 require_once __DIR__ . '/config/config.php';
@@ -161,12 +161,9 @@ try {
                                 <?php if($form['otd_score']): ?><span class="mini-badge">OTD: <?php echo $form['otd_score']; ?></span><?php endif; ?>
                                 <?php if($form['ftr_score']): ?><span class="mini-badge">FTR: <?php echo $form['ftr_score']; ?></span><?php endif; ?>
                                 
-                                <?php 
-                                    if(!empty($form['skills_rating'])): 
-                                        $displaySkills = str_replace(',', ' • ', $form['skills_rating']);
-                                ?>
-                                    <span class="mini-badge" style="background:#e0e7ff; color:#014486; border:1px solid rgba(1,118,211,0.2);">
-                                        <?php echo htmlspecialchars($displaySkills); ?>
+                                <?php if(!empty($form['errors_text'])): ?>
+                                    <span class="mini-badge" style="background:#fee2e2; color:#991b1b; border:1px solid #fecaca;">
+                                        Errors: <?php echo htmlspecialchars($form['errors_text']); ?>
                                     </span>
                                 <?php endif; ?>
                             </div>
