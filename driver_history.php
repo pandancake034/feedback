@@ -52,7 +52,7 @@ try {
         body { margin: 0; font-family: 'Segoe UI', sans-serif; background: var(--bg-body); color: var(--text-main); display: flex; height: 100vh; overflow: hidden; }
         * { box-sizing: border-box; }
 
-        /* --- SIDEBAR & LAYOUT CSS (Toegevoegd) --- */
+        /* --- LAYOUT & SIDEBAR (Gecorrigeerd) --- */
         .sidebar { width: 240px; background: #1a2233; color: white; display: flex; flex-direction: column; flex-shrink: 0; }
         .sidebar-header { height: 60px; padding: 0 20px; display: flex; align-items: center; background: rgba(0,0,0,0.2); border-bottom: 1px solid rgba(255,255,255,0.1); }
         .sidebar-logo { max-height: 40px; }
@@ -62,13 +62,17 @@ try {
         .nav-item .material-icons-outlined { margin-right: 12px; }
 
         .main-content { flex-grow: 1; display: flex; flex-direction: column; overflow-y: auto; }
+        
+        /* --- HEADER STYLING (Toegevoegd) --- */
+        .top-header { height: 60px; background: white; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; padding: 0 24px; position: sticky; top: 0; z-index: 10; flex-shrink: 0; }
+
         .content-body { padding: 24px; max-width: 1000px; margin: 0 auto; width: 100%; }
 
         /* Cards */
         .card { background: white; border: 1px solid var(--border-color); border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); overflow: hidden; margin-bottom: 24px; }
         .card-body { padding: 24px; }
 
-        /* Header */
+        /* Page Header */
         .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
         .driver-title { margin: 0; font-size: 24px; color: var(--text-main); }
         .driver-sub { color: var(--text-light); font-size: 14px; margin-top: 4px; }
