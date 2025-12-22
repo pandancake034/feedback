@@ -86,7 +86,7 @@ try {
     die("Database fout: " . $e->getMessage());
 }
 
-$page_title = "Dossier Inzien";
+$page_title = "Dossier " . htmlspecialchars($form['driver_name']) . " (" . htmlspecialchars($form['employee_id']) . ")";
 
 function getInitials($name) {
     $parts = explode(' ', $name);
