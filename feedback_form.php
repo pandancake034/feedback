@@ -1,10 +1,4 @@
 <?php
-/**
- * FEEDBACK_FORM.PHP
- * - Create & Edit functionaliteit
- * - Toggle voor Bestaande/Nieuwe chauffeur bij aanmaken
- */
-
 require_once __DIR__ . '/config/config.php';
 require_once __DIR__ . '/config/db.php';
 
@@ -28,7 +22,7 @@ try {
 
 // Standaard waarden instellen
 $data = [
-    'driver_id'   => '', // Nieuw veld voor ID
+    'driver_id'   => '', 
     'driver_name' => '', 
     'employee_id' => '', 
     'agency' => '', 
@@ -157,7 +151,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             
         } else {
             // UPDATE
-            // Let op: driver_id wordt hier ook geupdate, mocht je van chauffeur gewisseld zijn
             $sql = "UPDATE feedback_forms SET 
                         driver_id = ?, form_date = ?, start_date = ?, review_moment = ?, agency = ?,
                         routes_count = ?, otd_score = ?, ftr_score = ?, errors_text = ?, late_text = ?,
@@ -216,9 +209,39 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         input:focus, textarea:focus { border-color: var(--brand-color); outline: none; }
         textarea { resize: vertical; min-height: 80px; }
 
-        /* Toggle Styles */
-        .toggle-container { display: flex; gap: 15px; margin-bottom: 15px; }
-        .radio-label { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 14px; }
+        /* --- NIEUWE TOGGLE STYLING (SEGMENTED CONTROL) --- */
+        .toggle-wrapper {
+            display: inline-flex;
+            background: #f3f2f2;
+            padding: 4px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+        }
+        /* Verberg de standaard bolletjes */
+        .toggle-wrapper input[type="radio"] {
+            display: none;
+        }
+        /* Styling van de labels (de 'knoppen') */
+        .toggle-option {
+            padding: 8px 16px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+            user-select: none; /* Voorkomt tekstselectie bij dubbelklik */
+        }
+        .toggle-option:hover {
+            color: var(--brand-color);
+        }
+        /* Als de radio checked is, style het label er direct achter */
+        .toggle-wrapper input[type="radio"]:checked + .toggle-option {
+            background-color: white;
+            color: var(--brand-color);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
         .hidden { display: none; }
 
         .action-bar { position: fixed; bottom: 0; left: 240px; right: 0; background: white; border-top: 1px solid var(--border-color); padding: 15px 24px; display: flex; justify-content: flex-end; gap: 10px; }
@@ -254,20 +277,17 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         
                         <?php if ($is_new): ?>
                             <div class="form-group">
-                                <label>Keuze Chauffeur:</label>
-                                <div class="toggle-container">
-                                    <label class="radio-label">
-                                        <input type="radio" name="driver_mode" value="existing" checked onclick="toggleDriverMode('existing')">
-                                        Bestaande chauffeur
-                                    </label>
-                                    <label class="radio-label">
-                                        <input type="radio" name="driver_mode" value="new" onclick="toggleDriverMode('new')">
-                                        Nieuwe invoeren
-                                    </label>
+                                <label style="margin-bottom:8px;">Wie wil je bespreken?</label>
+                                <div class="toggle-wrapper">
+                                    <input type="radio" name="driver_mode" id="mode_existing" value="existing" checked onclick="toggleDriverMode('existing')">
+                                    <label for="mode_existing" class="toggle-option">Bestaande chauffeur</label>
+
+                                    <input type="radio" name="driver_mode" id="mode_new" value="new" onclick="toggleDriverMode('new')">
+                                    <label for="mode_new" class="toggle-option">Nieuwe chauffeur</label>
                                 </div>
                             </div>
 
-                            <div id="block-existing" class="form-group">
+                            <div id="block-existing" class="form-group" style="margin-top: 15px;">
                                 <label>Selecteer Chauffeur *</label>
                                 <select name="existing_driver_id">
                                     <option value="">-- Kies uit lijst --</option>
@@ -277,7 +297,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                 </select>
                             </div>
 
-                            <div id="block-new" class="form-grid hidden">
+                            <div id="block-new" class="form-grid hidden" style="margin-top: 15px;">
                                 <div class="form-group">
                                     <label>Naam Chauffeur *</label>
                                     <input type="text" name="driver_name" placeholder="Bijv. Jan Jansen">
