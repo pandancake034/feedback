@@ -1,4 +1,10 @@
 <?php
+/**
+ * FEEDBACK_FORM.PHP
+ * - Create & Edit functionaliteit
+ * - Toggle voor Bestaande/Nieuwe chauffeur bij aanmaken
+ */
+
 require_once __DIR__ . '/config/config.php';
 require_once __DIR__ . '/config/db.php';
 
@@ -11,12 +17,21 @@ $is_new  = empty($form_id);
 
 $error   = "";
 $success = "";
+$drivers = []; // Lijst voor dropdown
+
+// Drivers ophalen voor de dropdown (nodig bij 'Nieuw')
+try {
+    $stmtD = $pdo->query("SELECT id, name, employee_id FROM drivers ORDER BY name ASC");
+    $drivers = $stmtD->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) { /* Negeer */ }
+
 
 // Standaard waarden instellen
 $data = [
+    'driver_id'   => '', // Nieuw veld voor ID
     'driver_name' => '', 
     'employee_id' => '', 
-    'agency' => '', // AANGEPAST: Standaard leeg laten
+    'agency' => '', 
     'form_date' => date('Y-m-d'), 
     'start_date' => date('Y-m-d', strtotime('-1 week')),
     'review_moment' => '',
@@ -57,106 +72,120 @@ if (!$is_new) {
 // --- 3. OPSLAAN (POST REQUEST) ---
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     
-    // Gegevens ophalen (met veilige ?? fallback)
-    $driver_name = trim($_POST['driver_name'] ?? '');
-    $employee_id = trim($_POST['employee_id'] ?? '');
-    
-    if (empty($driver_name) || empty($employee_id)) {
-        $error = "Naam en Personeelsnummer zijn verplicht.";
-    } else {
-        try {
-            $pdo->beginTransaction();
+    try {
+        $pdo->beginTransaction();
 
-            // STAP A: Chauffeur regelen
+        $driver_id = null;
+        
+        // LOGICA: BEPALEN WELKE CHAUFFEUR
+        // Check 1: Is er een bestaande chauffeur gekozen via dropdown? (Alleen bij nieuw)
+        if ($is_new && isset($_POST['driver_mode']) && $_POST['driver_mode'] === 'existing') {
+            if (empty($_POST['existing_driver_id'])) {
+                throw new Exception("Selecteer een chauffeur uit de lijst.");
+            }
+            $driver_id = $_POST['existing_driver_id'];
+        
+        // Check 2: Nieuwe chauffeur of Bewerken bestaande (Text inputs)
+        } else {
+            $driver_name = trim($_POST['driver_name'] ?? '');
+            $employee_id = trim($_POST['employee_id'] ?? '');
+
+            if (empty($driver_name) || empty($employee_id)) {
+                throw new Exception("Naam en Personeelsnummer zijn verplicht.");
+            }
+
+            // Zoek of chauffeur al bestaat op basis van personeelsnummer
             $stmt = $pdo->prepare("SELECT id FROM drivers WHERE employee_id = ?");
             $stmt->execute([$employee_id]);
             $driverRow = $stmt->fetch();
 
             if ($driverRow) {
+                // Bestaat al -> Update naam en gebruik ID
                 $driver_id = $driverRow['id'];
                 $pdo->prepare("UPDATE drivers SET name = ? WHERE id = ?")->execute([$driver_name, $driver_id]);
             } else {
+                // Bestaat niet -> Nieuwe aanmaken
                 $stmt = $pdo->prepare("INSERT INTO drivers (name, employee_id) VALUES (?, ?)");
                 $stmt->execute([$driver_name, $employee_id]);
                 $driver_id = $pdo->lastInsertId();
             }
-
-            // STAP B: Formulier Opslaan
-            $new_status = (isset($_POST['action']) && $_POST['action'] === 'complete') ? 'completed' : 'open';
-
-            // Alle velden ophalen
-            $form_date       = $_POST['form_date'] ?? date('Y-m-d');
-            $start_date      = $_POST['start_date'] ?? date('Y-m-d');
-            $review_moment   = $_POST['review_moment'] ?? '';
-            $agency          = $_POST['agency'] ?? '';
-            $routes_count    = $_POST['routes_count'] ?? 0;
-            
-            // Zeker weten dat de scores correct worden opgeslagen (met %)
-            $otd_score       = $_POST['otd_score'] ?? '';
-            $ftr_score       = $_POST['ftr_score'] ?? '';
-            // Verwijder eventuele dubbele % tekens voor de zekerheid aan server-kant
-            $otd_score = str_replace('%', '', $otd_score) . '%';
-            $ftr_score = str_replace('%', '', $ftr_score) . '%';
-            if($otd_score === '%') $otd_score = ''; // Als leeg was, blijft leeg
-            if($ftr_score === '%') $ftr_score = ''; 
-
-            $errors_text     = $_POST['errors_text'] ?? '';
-            $late_text       = $_POST['late_text'] ?? '';
-            $driving_behavior= $_POST['driving_behavior'] ?? '';
-            $warnings        = $_POST['warnings'] ?? '';
-            $kw_score        = $_POST['kw_score'] ?? '';
-            $skills_rating   = $_POST['skills_rating'] ?? 0;
-            $proficiency_rating = $_POST['proficiency_rating'] ?? 0;
-            $client_compliment  = $_POST['client_compliment'] ?? '';
-
-            if ($is_new) {
-                // INSERT
-                $sql = "INSERT INTO feedback_forms (
-                            driver_id, created_by_user_id, form_date, start_date, review_moment, agency,
-                            routes_count, otd_score, ftr_score, errors_text, nokd_text, late_text,
-                            driving_behavior, warnings, kw_score, skills_rating, proficiency_rating, client_compliment,
-                            status
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?, ?)";
-                
-                $stmt = $pdo->prepare($sql);
-                $stmt->execute([
-                    $driver_id, $_SESSION['user_id'], $form_date, $start_date, $review_moment, $agency,
-                    $routes_count, $otd_score, $ftr_score, $errors_text, $late_text,
-                    $driving_behavior, $warnings, $kw_score, $skills_rating, $proficiency_rating, $client_compliment,
-                    $new_status
-                ]);
-                
-            } else {
-                // UPDATE
-                $sql = "UPDATE feedback_forms SET 
-                            driver_id = ?, form_date = ?, start_date = ?, review_moment = ?, agency = ?,
-                            routes_count = ?, otd_score = ?, ftr_score = ?, errors_text = ?, late_text = ?,
-                            driving_behavior = ?, warnings = ?, kw_score = ?, skills_rating = ?, proficiency_rating = ?, client_compliment = ?,
-                            status = ?, updated_at = NOW()
-                        WHERE id = ?";
-                
-                $stmt = $pdo->prepare($sql);
-                $stmt->execute([
-                    $driver_id, $form_date, $start_date, $review_moment, $agency,
-                    $routes_count, $otd_score, $ftr_score, $errors_text, $late_text,
-                    $driving_behavior, $warnings, $kw_score, $skills_rating, $proficiency_rating, $client_compliment,
-                    $new_status, $form_id
-                ]);
-            }
-
-            $pdo->commit();
-
-            if ($new_status === 'completed') {
-                header("Location: dashboard.php?msg=completed");
-            } else {
-                header("Location: dashboard.php?msg=saved");
-            }
-            exit;
-
-        } catch (PDOException $e) {
-            $pdo->rollBack();
-            $error = "Database fout: " . $e->getMessage();
         }
+
+        // STAP B: Formulier Opslaan
+        $new_status = (isset($_POST['action']) && $_POST['action'] === 'complete') ? 'completed' : 'open';
+
+        // Alle overige velden ophalen
+        $form_date       = $_POST['form_date'] ?? date('Y-m-d');
+        $start_date      = $_POST['start_date'] ?? date('Y-m-d');
+        $review_moment   = $_POST['review_moment'] ?? '';
+        $agency          = $_POST['agency'] ?? '';
+        $routes_count    = $_POST['routes_count'] ?? 0;
+        
+        // Scores formatteren
+        $otd_score       = $_POST['otd_score'] ?? '';
+        $ftr_score       = $_POST['ftr_score'] ?? '';
+        $otd_score = str_replace('%', '', $otd_score) . '%';
+        $ftr_score = str_replace('%', '', $ftr_score) . '%';
+        if($otd_score === '%') $otd_score = ''; 
+        if($ftr_score === '%') $ftr_score = ''; 
+
+        $errors_text     = $_POST['errors_text'] ?? '';
+        $late_text       = $_POST['late_text'] ?? '';
+        $driving_behavior= $_POST['driving_behavior'] ?? '';
+        $warnings        = $_POST['warnings'] ?? '';
+        $kw_score        = $_POST['kw_score'] ?? '';
+        $skills_rating   = $_POST['skills_rating'] ?? 0;
+        $proficiency_rating = $_POST['proficiency_rating'] ?? 0;
+        $client_compliment  = $_POST['client_compliment'] ?? '';
+
+        if ($is_new) {
+            // INSERT
+            $sql = "INSERT INTO feedback_forms (
+                        driver_id, created_by_user_id, form_date, start_date, review_moment, agency,
+                        routes_count, otd_score, ftr_score, errors_text, nokd_text, late_text,
+                        driving_behavior, warnings, kw_score, skills_rating, proficiency_rating, client_compliment,
+                        status
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?, ?)";
+            
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([
+                $driver_id, $_SESSION['user_id'], $form_date, $start_date, $review_moment, $agency,
+                $routes_count, $otd_score, $ftr_score, $errors_text, $late_text,
+                $driving_behavior, $warnings, $kw_score, $skills_rating, $proficiency_rating, $client_compliment,
+                $new_status
+            ]);
+            
+        } else {
+            // UPDATE
+            // Let op: driver_id wordt hier ook geupdate, mocht je van chauffeur gewisseld zijn
+            $sql = "UPDATE feedback_forms SET 
+                        driver_id = ?, form_date = ?, start_date = ?, review_moment = ?, agency = ?,
+                        routes_count = ?, otd_score = ?, ftr_score = ?, errors_text = ?, late_text = ?,
+                        driving_behavior = ?, warnings = ?, kw_score = ?, skills_rating = ?, proficiency_rating = ?, client_compliment = ?,
+                        status = ?, updated_at = NOW()
+                    WHERE id = ?";
+            
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([
+                $driver_id, $form_date, $start_date, $review_moment, $agency,
+                $routes_count, $otd_score, $ftr_score, $errors_text, $late_text,
+                $driving_behavior, $warnings, $kw_score, $skills_rating, $proficiency_rating, $client_compliment,
+                $new_status, $form_id
+            ]);
+        }
+
+        $pdo->commit();
+
+        if ($new_status === 'completed') {
+            header("Location: dashboard.php?msg=completed");
+        } else {
+            header("Location: dashboard.php?msg=saved");
+        }
+        exit;
+
+    } catch (Exception $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        $error = "Fout: " . $e->getMessage();
     }
 }
 ?>
@@ -186,6 +215,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         input, select, textarea { width: 100%; padding: 8px 12px; border: 1px solid #dddbda; border-radius: 4px; font-size: 14px; font-family: inherit; }
         input:focus, textarea:focus { border-color: var(--brand-color); outline: none; }
         textarea { resize: vertical; min-height: 80px; }
+
+        /* Toggle Styles */
+        .toggle-container { display: flex; gap: 15px; margin-bottom: 15px; }
+        .radio-label { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 14px; }
+        .hidden { display: none; }
 
         .action-bar { position: fixed; bottom: 0; left: 240px; right: 0; background: white; border-top: 1px solid var(--border-color); padding: 15px 24px; display: flex; justify-content: flex-end; gap: 10px; }
         .btn { padding: 9px 16px; border-radius: 4px; font-size: 13px; font-weight: 600; cursor: pointer; border: 1px solid transparent; text-decoration: none; }
@@ -217,16 +251,57 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 <div class="card">
                     <h3 class="form-section-title">1. Chauffeur & Planning</h3>
                     <div class="card-body">
+                        
+                        <?php if ($is_new): ?>
+                            <div class="form-group">
+                                <label>Keuze Chauffeur:</label>
+                                <div class="toggle-container">
+                                    <label class="radio-label">
+                                        <input type="radio" name="driver_mode" value="existing" checked onclick="toggleDriverMode('existing')">
+                                        Bestaande chauffeur
+                                    </label>
+                                    <label class="radio-label">
+                                        <input type="radio" name="driver_mode" value="new" onclick="toggleDriverMode('new')">
+                                        Nieuwe invoeren
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div id="block-existing" class="form-group">
+                                <label>Selecteer Chauffeur *</label>
+                                <select name="existing_driver_id">
+                                    <option value="">-- Kies uit lijst --</option>
+                                    <?php foreach ($drivers as $d): ?>
+                                        <option value="<?php echo $d['id']; ?>"><?php echo htmlspecialchars($d['name']); ?> (<?php echo htmlspecialchars($d['employee_id']); ?>)</option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+
+                            <div id="block-new" class="form-grid hidden">
+                                <div class="form-group">
+                                    <label>Naam Chauffeur *</label>
+                                    <input type="text" name="driver_name" placeholder="Bijv. Jan Jansen">
+                                </div>
+                                <div class="form-group">
+                                    <label>Personeelsnummer *</label>
+                                    <input type="text" name="employee_id" placeholder="Bijv. 12345">
+                                </div>
+                            </div>
+
+                        <?php else: ?>
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label>Naam Chauffeur *</label>
+                                    <input type="text" name="driver_name" value="<?php echo htmlspecialchars($data['driver_name']); ?>" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Personeelsnummer *</label>
+                                    <input type="text" name="employee_id" value="<?php echo htmlspecialchars($data['employee_id']); ?>" required>
+                                </div>
+                            </div>
+                        <?php endif; ?>
+
                         <div class="form-grid">
-                            <div class="form-group">
-                                <label>Naam Chauffeur *</label>
-                                <input type="text" name="driver_name" value="<?php echo htmlspecialchars($data['driver_name']); ?>" required placeholder="Bijv. Jan Jansen">
-                            </div>
-                            <div class="form-group">
-                                <label>Personeelsnummer *</label>
-                                <input type="text" name="employee_id" value="<?php echo htmlspecialchars($data['employee_id']); ?>" required placeholder="Bijv. 12345">
-                            </div>
-                            
                             <div class="form-group">
                                 <label>Uitzendbureau:</label>
                                 <input type="text" name="agency" list="agency_options" value="<?php echo htmlspecialchars($data['agency']); ?>" placeholder="Typ of kies...">
@@ -251,7 +326,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                 <label>Beoordelingsmoment:</label>
                                 <select name="review_moment">
                                     <option value="">-- Kies --</option>
-                                    <option value="8 ritten" <?php if($data['review_moment'] == '8 weken') echo 'selected'; ?>>8 ritten</option>
+                                    <option value="8 ritten" <?php if($data['review_moment'] == '8 weken' || $data['review_moment'] == '8 ritten') echo 'selected'; ?>>8 ritten</option>
                                     <option value="26 weken" <?php if($data['review_moment'] == '26 weken') echo 'selected'; ?>>26 weken</option>
                                     <option value="52 weken" <?php if($data['review_moment'] == '52 weken') echo 'selected'; ?>>52 weken</option>
                                 </select>
@@ -344,6 +419,20 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     </main>
     
     <script>
+        // Toggle Logica
+        function toggleDriverMode(mode) {
+            const blockExisting = document.getElementById('block-existing');
+            const blockNew = document.getElementById('block-new');
+
+            if (mode === 'existing') {
+                blockExisting.classList.remove('hidden');
+                blockNew.classList.add('hidden');
+            } else {
+                blockExisting.classList.add('hidden');
+                blockNew.classList.remove('hidden');
+            }
+        }
+
         function formatPercentage(input) {
             let val = input.value.trim();
             if (val === '') return;
