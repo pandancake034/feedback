@@ -2,17 +2,15 @@
 /**
  * DRIVER_HISTORY.PHP
  * Overzicht van alle gesprekken van één specifieke chauffeur.
+ * Update: Skills weergave aangepast.
  */
 
 require_once __DIR__ . '/config/config.php';
 require_once __DIR__ . '/config/db.php';
-require_once __DIR__ . '/includes/helpers.php'; // Zorg dat helpers.php bestaat voor de status badges
+require_once __DIR__ . '/includes/helpers.php';
 
 // 1. Check ID
-if (!isset($_GET['driver_id'])) {
-    header("Location: dashboard.php");
-    exit;
-}
+if (!isset($_GET['driver_id'])) { header("Location: dashboard.php"); exit; }
 $driver_id = $_GET['driver_id'];
 
 // 2. Haal Chauffeur Info op
@@ -23,8 +21,7 @@ try {
 
     if (!$driver) die("Chauffeur niet gevonden.");
 
-    // 3. Haal ALLE gesprekken op van deze chauffeur (Historie)
-    // Nieuwste eerst
+    // 3. Haal ALLE gesprekken op
     $stmtForms = $pdo->prepare("
         SELECT f.*, u.email as creator_email 
         FROM feedback_forms f
@@ -52,7 +49,7 @@ try {
         body { margin: 0; font-family: 'Segoe UI', sans-serif; background: var(--bg-body); color: var(--text-main); display: flex; height: 100vh; overflow: hidden; }
         * { box-sizing: border-box; }
 
-        /* --- LAYOUT & SIDEBAR (Gecorrigeerd) --- */
+        /* --- LAYOUT & SIDEBAR --- */
         .sidebar { width: 240px; background: #1a2233; color: white; display: flex; flex-direction: column; flex-shrink: 0; }
         .sidebar-header { height: 60px; padding: 0 20px; display: flex; align-items: center; background: rgba(0,0,0,0.2); border-bottom: 1px solid rgba(255,255,255,0.1); }
         .sidebar-logo { max-height: 40px; }
@@ -62,10 +59,7 @@ try {
         .nav-item .material-icons-outlined { margin-right: 12px; }
 
         .main-content { flex-grow: 1; display: flex; flex-direction: column; overflow-y: auto; }
-        
-        /* --- HEADER STYLING (Toegevoegd) --- */
         .top-header { height: 60px; background: white; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; padding: 0 24px; position: sticky; top: 0; z-index: 10; flex-shrink: 0; }
-
         .content-body { padding: 24px; max-width: 1000px; margin: 0 auto; width: 100%; }
 
         /* Cards */
@@ -104,7 +98,7 @@ try {
         .item-title { font-weight: 700; font-size: 15px; color: var(--brand-color); }
         .item-date { font-size: 13px; color: #999; }
         
-        .item-badges { display: flex; gap: 8px; margin-top: 8px; }
+        .item-badges { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
         .mini-badge { background: #f3f4f6; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; color: #374151; }
     </style>
 </head>
@@ -166,7 +160,15 @@ try {
                             <div class="item-badges">
                                 <?php if($form['otd_score']): ?><span class="mini-badge">OTD: <?php echo $form['otd_score']; ?></span><?php endif; ?>
                                 <?php if($form['ftr_score']): ?><span class="mini-badge">FTR: <?php echo $form['ftr_score']; ?></span><?php endif; ?>
-                                <?php if($form['skills_rating'] > 0): ?><span class="mini-badge">Skills: <?php echo $form['skills_rating']; ?>/5</span><?php endif; ?>
+                                
+                                <?php 
+                                    if(!empty($form['skills_rating'])): 
+                                        $displaySkills = str_replace(',', ' • ', $form['skills_rating']);
+                                ?>
+                                    <span class="mini-badge" style="background:#e0e7ff; color:#014486; border:1px solid rgba(1,118,211,0.2);">
+                                        <?php echo htmlspecialchars($displaySkills); ?>
+                                    </span>
+                                <?php endif; ?>
                             </div>
 
                             <div style="margin-top: 15px; border-top: 1px solid #eee; padding-top: 10px;">

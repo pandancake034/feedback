@@ -2,8 +2,7 @@
 /**
  * FEEDBACK_VIEW.PHP
  * High-end versie: Visualisaties, Steppers, CSRF, Avatar.
- * Update: CHAT LAYOUT (WhatsApp style) voor notities.
- * Update: Naam in header is nu klikbaar naar driver_history.php
+ * Update: Skills als tekst labels (tags).
  */
 
 require_once __DIR__ . '/config/config.php';
@@ -115,7 +114,7 @@ function getInitials($name) {
         .content-body { padding: 24px; display: flex; gap: 24px; flex-grow: 1; max-width: 1600px; margin: 0 auto; width: 100%; }
         
         .col-left { flex: 2; display: flex; flex-direction: column; gap: 24px; }
-        .col-right { flex: 1; min-width: 400px; /* Iets breder voor chat */ }
+        .col-right { flex: 1; min-width: 400px; }
 
         .card { background: white; border: 1px solid var(--border-color); border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); overflow: hidden; }
         .card-header { padding: 16px 20px; background: #fff; border-bottom: 1px solid #f0f0f0; font-weight: 700; font-size: 15px; display: flex; justify-content: space-between; align-items: center; color: var(--brand-color); }
@@ -130,7 +129,6 @@ function getInitials($name) {
             font-size: 24px; font-weight: 700; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border: 3px solid white;
         }
         
-        /* KLIKBARE NAAM CSS */
         .profile-link { color: var(--text-main); text-decoration: none; transition: color 0.2s; }
         .profile-link:hover { color: var(--brand-color); text-decoration: underline; }
 
@@ -155,7 +153,7 @@ function getInitials($name) {
         .step.completed .step-icon { background: #10b981; color: white; }
         .step.completed::after { background: #10b981; }
 
-        /* --- CHAT STYLES (NIEUW) --- */
+        /* --- CHAT STYLES --- */
         .chat-container { display: flex; flex-direction: column; gap: 15px; padding-bottom: 20px; }
         .chat-row { display: flex; align-items: flex-end; gap: 10px; width: 100%; }
         .chat-row.me { justify-content: flex-end; }
@@ -324,12 +322,29 @@ function getInitials($name) {
                             </div>
                         </div>
                         <div class="detail-grid" style="margin-bottom: 20px;">
+                            
                             <div class="detail-item">
-                                <div class="label">Skills Rating</div>
-                                <div style="color: #f59e0b;">
-                                    <?php $stars = intval($form['skills_rating']); for($i=0; $i<5; $i++) { echo ($i < $stars) ? '<span class="material-icons-outlined" style="font-size:18px;">star</span>' : '<span class="material-icons-outlined" style="font-size:18px; color:#ddd;">star_border</span>'; } ?>
+                                <div class="label">Skills / Rollen</div>
+                                <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:4px;">
+                                    <?php 
+                                    $skillsList = explode(',', $form['skills_rating'] ?? '');
+                                    $hasSkills = false;
+                                    foreach($skillsList as $skill):
+                                        $skill = trim($skill);
+                                        if(!empty($skill)): 
+                                            $hasSkills = true;
+                                    ?>
+                                        <span style="background:#e0e7ff; color:#014486; border:1px solid #0176d3; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600;">
+                                            <?php echo htmlspecialchars($skill); ?>
+                                        </span>
+                                    <?php 
+                                        endif; 
+                                    endforeach; 
+                                    if(!$hasSkills) echo '<span style="color:#999; font-style:italic; font-size:13px;">Geen skills geregistreerd.</span>';
+                                    ?>
                                 </div>
                             </div>
+
                             <div class="detail-item"><div class="label">Proficiency Level</div><div class="value">Niveau <strong><?php echo $form['proficiency_rating']; ?></strong> / 14</div></div>
                         </div>
                         <div class="detail-grid">
@@ -363,24 +378,16 @@ function getInitials($name) {
                                 <?php foreach($notes as $note): 
                                     $displayName = (!empty($note['first_name'])) ? $note['first_name'] . ' ' . $note['last_name'] : $note['email'];
                                     $initials = getInitials($displayName);
-                                    
-                                    // Bepaal of IK het ben (voor layout rechts)
                                     $isMe = ($note['user_id'] == $_SESSION['user_id']);
-                                    
-                                    // Check eigenaarschap voor edits (of admin)
                                     $canEdit = ($isMe || (isset($_SESSION['role']) && $_SESSION['role'] === 'admin'));
-                                    
-                                    // CSS Classes op basis van 'me' of 'other'
                                     $rowClass = $isMe ? 'me' : 'other';
                                 ?>
                                 <div class="chat-row <?php echo $rowClass; ?>">
-                                    
                                     <?php if(!$isMe): ?>
                                         <div class="chat-avatar" title="<?php echo htmlspecialchars($displayName); ?>">
                                             <?php echo $initials; ?>
                                         </div>
                                     <?php endif; ?>
-
                                     <div class="chat-bubble">
                                         <div class="chat-meta">
                                             <span class="chat-name"><?php echo htmlspecialchars($isMe ? 'Ik' : $displayName); ?></span>
@@ -400,18 +407,11 @@ function getInitials($name) {
                                             </span>
                                             <?php endif; ?>
                                         </div>
-                                        
-                                        <div>
-                                            <?php echo nl2br(htmlspecialchars($note['content'])); ?>
-                                        </div>
+                                        <div><?php echo nl2br(htmlspecialchars($note['content'])); ?></div>
                                     </div>
-
                                     <?php if($isMe): ?>
-                                        <div class="chat-avatar">
-                                            <?php echo $initials; ?>
-                                        </div>
+                                        <div class="chat-avatar"><?php echo $initials; ?></div>
                                     <?php endif; ?>
-
                                 </div>
                                 <?php endforeach; ?>
                             <?php endif; ?>
@@ -458,20 +458,12 @@ function getInitials($name) {
             editInputContent.value = content; 
             editModal.style.display = 'flex';
         }
+        function closeEditNote() { editModal.style.display = 'none'; }
 
-        function closeEditNote() {
-            editModal.style.display = 'none';
-        }
-
-        editModal.addEventListener('click', (e) => {
-            if (e.target === editModal) closeEditNote();
-        });
-        
-        // Auto scroll naar beneden bij laden van pagina (handig voor chat)
+        editModal.addEventListener('click', (e) => { if (e.target === editModal) closeEditNote(); });
         document.addEventListener("DOMContentLoaded", function() {
             var container = document.querySelector('.card-body[style*="overflow-y: auto"]');
-            if(container) container.scrollTop = 0; // Dossiers lees je vaak van boven naar beneden, dus 0 is beter.
-            // Als je liever naar beneden springt (zoals whatsapp): container.scrollTop = container.scrollHeight;
+            if(container) container.scrollTop = 0; 
         });
     </script>
 

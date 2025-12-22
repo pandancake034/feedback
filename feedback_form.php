@@ -1,4 +1,9 @@
 <?php
+/**
+ * FEEDBACK_FORM.PHP
+ * Update: Skills is nu een tag-systeem ipv cijfers.
+ */
+
 require_once __DIR__ . '/config/config.php';
 require_once __DIR__ . '/config/db.php';
 
@@ -38,7 +43,7 @@ $data = [
     'driving_behavior' => '',
     'warnings' => '', 
     'client_compliment' => '',
-    'skills_rating' => 0, 
+    'skills_rating' => '', // Nu een lege string ipv 0
     'proficiency_rating' => 0,
     'status' => 'open'
 ];
@@ -72,14 +77,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $driver_id = null;
         
         // LOGICA: BEPALEN WELKE CHAUFFEUR
-        // Check 1: Is er een bestaande chauffeur gekozen via dropdown? (Alleen bij nieuw)
         if ($is_new && isset($_POST['driver_mode']) && $_POST['driver_mode'] === 'existing') {
             if (empty($_POST['existing_driver_id'])) {
                 throw new Exception("Selecteer een chauffeur uit de lijst.");
             }
             $driver_id = $_POST['existing_driver_id'];
         
-        // Check 2: Nieuwe chauffeur of Bewerken bestaande (Text inputs)
         } else {
             $driver_name = trim($_POST['driver_name'] ?? '');
             $employee_id = trim($_POST['employee_id'] ?? '');
@@ -88,17 +91,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 throw new Exception("Naam en Personeelsnummer zijn verplicht.");
             }
 
-            // Zoek of chauffeur al bestaat op basis van personeelsnummer
+            // Zoek of chauffeur al bestaat
             $stmt = $pdo->prepare("SELECT id FROM drivers WHERE employee_id = ?");
             $stmt->execute([$employee_id]);
             $driverRow = $stmt->fetch();
 
             if ($driverRow) {
-                // Bestaat al -> Update naam en gebruik ID
                 $driver_id = $driverRow['id'];
                 $pdo->prepare("UPDATE drivers SET name = ? WHERE id = ?")->execute([$driver_name, $driver_id]);
             } else {
-                // Bestaat niet -> Nieuwe aanmaken
                 $stmt = $pdo->prepare("INSERT INTO drivers (name, employee_id) VALUES (?, ?)");
                 $stmt->execute([$driver_name, $employee_id]);
                 $driver_id = $pdo->lastInsertId();
@@ -108,7 +109,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         // STAP B: Formulier Opslaan
         $new_status = (isset($_POST['action']) && $_POST['action'] === 'complete') ? 'completed' : 'open';
 
-        // Alle overige velden ophalen
         $form_date       = $_POST['form_date'] ?? date('Y-m-d');
         $start_date      = $_POST['start_date'] ?? date('Y-m-d');
         $review_moment   = $_POST['review_moment'] ?? '';
@@ -128,7 +128,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $driving_behavior= $_POST['driving_behavior'] ?? '';
         $warnings        = $_POST['warnings'] ?? '';
         $kw_score        = $_POST['kw_score'] ?? '';
-        $skills_rating   = $_POST['skills_rating'] ?? 0;
+        
+        // SKILLS: Dit komt nu als tekst binnen vanuit het hidden field (bv "Laden+rit,Parkeerwachter")
+        $skills_rating   = $_POST['skills_rating'] ?? ''; 
+        
         $proficiency_rating = $_POST['proficiency_rating'] ?? 0;
         $client_compliment  = $_POST['client_compliment'] ?? '';
 
@@ -186,7 +189,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <html lang="nl">
 <head>
     <meta charset="UTF-8">
-<title><?php echo APP_TITLE; ?></title>
+    <title><?php echo APP_TITLE; ?></title>
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
@@ -209,42 +212,42 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         input:focus, textarea:focus { border-color: var(--brand-color); outline: none; }
         textarea { resize: vertical; min-height: 80px; }
 
-        /* --- NIEUWE TOGGLE STYLING (SEGMENTED CONTROL) --- */
-        .toggle-wrapper {
-            display: inline-flex;
-            background: #f3f2f2;
-            padding: 4px;
-            border-radius: 6px;
-            border: 1px solid var(--border-color);
-        }
-        /* Verberg de standaard bolletjes */
-        .toggle-wrapper input[type="radio"] {
-            display: none;
-        }
-        /* Styling van de labels (de 'knoppen') */
-        .toggle-option {
-            padding: 8px 16px;
-            font-size: 13px;
-            font-weight: 600;
-            color: var(--text-secondary);
-            cursor: pointer;
-            border-radius: 4px;
-            transition: all 0.2s ease;
-            user-select: none; /* Voorkomt tekstselectie bij dubbelklik */
-        }
-        .toggle-option:hover {
-            color: var(--brand-color);
-        }
-        /* Als de radio checked is, style het label er direct achter */
-        .toggle-wrapper input[type="radio"]:checked + .toggle-option {
-            background-color: white;
-            color: var(--brand-color);
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-
+        /* --- TOGGLE STYLING --- */
+        .toggle-wrapper { display: inline-flex; background: #f3f2f2; padding: 4px; border-radius: 6px; border: 1px solid var(--border-color); }
+        .toggle-wrapper input[type="radio"] { display: none; }
+        .toggle-option { padding: 8px 16px; font-size: 13px; font-weight: 600; color: var(--text-secondary); cursor: pointer; border-radius: 4px; transition: all 0.2s ease; user-select: none; }
+        .toggle-option:hover { color: var(--brand-color); }
+        .toggle-wrapper input[type="radio"]:checked + .toggle-option { background-color: white; color: var(--brand-color); box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
         .hidden { display: none; }
 
-        .action-bar { position: fixed; bottom: 0; left: 240px; right: 0; background: white; border-top: 1px solid var(--border-color); padding: 15px 24px; display: flex; justify-content: flex-end; gap: 10px; }
+        /* --- SKILLS TAG STYLING (NIEUW) --- */
+        .skills-container { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; min-height: 38px; }
+        .skill-tag {
+            background-color: #e0e7ff; 
+            color: var(--brand-dark); 
+            border: 1px solid rgba(1, 118, 211, 0.3);
+            padding: 4px 12px;
+            border-radius: 16px;
+            font-size: 13px;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            animation: fadeIn 0.2s ease-out;
+        }
+        .skill-tag .remove-skill {
+            cursor: pointer;
+            font-size: 16px;
+            display: flex; align-items: center; justify-content: center;
+            width: 18px; height: 18px;
+            border-radius: 50%;
+            transition: 0.2s;
+            line-height: 1;
+        }
+        .skill-tag .remove-skill:hover { background-color: var(--brand-color); color: white; }
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+
+        .action-bar { position: fixed; bottom: 0; left: 240px; right: 0; background: white; border-top: 1px solid var(--border-color); padding: 15px 24px; display: flex; justify-content: flex-end; gap: 10px; z-index: 100; }
         .btn { padding: 9px 16px; border-radius: 4px; font-size: 13px; font-weight: 600; cursor: pointer; border: 1px solid transparent; text-decoration: none; }
         .btn-cancel { background: white; border-color: var(--border-color); color: var(--text-main); }
         .btn-save { background: var(--brand-color); color: white; }
@@ -406,17 +409,23 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                             <textarea name="client_compliment" style="border-color: #86efac;"><?php echo htmlspecialchars($data['client_compliment']); ?></textarea>
                         </div>
                         <div class="form-grid">
+                            
                             <div class="form-group">
-                                <label> Skills (1-5)</label>
-                                <select name="skills_rating">
-                                    <option value="0">-- Kies --</option>
-                                    <?php for($i=1;$i<=5;$i++): ?>
-                                        <option value="<?php echo $i; ?>" <?php if($data['skills_rating']==$i) echo 'selected'; ?>><?php echo $i; ?></option>
-                                    <?php endfor; ?>
+                                <label>Skills / Rollen (Selecteer om toe te voegen)</label>
+                                <select id="skillSelector" onchange="addSkill(this.value)">
+                                    <option value="">-- Kies een skill --</option>
+                                    <option value="Laden+rit">Laden+rit</option>
+                                    <option value="Laden/Reserve">Laden/Reserve</option>
+                                    <option value="Parkeerwachter">Parkeerwachter</option>
+                                    <option value="Inchecken & Laadcoördinator">Inchecken & Laadcoördinator</option>
                                 </select>
+                                
+                                <div id="skillsContainer" class="skills-container"></div>
+                                <input type="hidden" name="skills_rating" id="skillsInput" value="<?php echo htmlspecialchars($data['skills_rating']); ?>">
                             </div>
+
                             <div class="form-group">
-                                <label>Proficiency Level:(1-14)</label>
+                                <label>Proficiency Level (1-14)</label>
                                 <select name="proficiency_rating">
                                     <option value="0">-- Kies --</option>
                                     <?php for($i=1;$i<=14;$i++): ?>
@@ -470,6 +479,47 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         if (ftrInput) {
             ftrInput.addEventListener('blur', function() { formatPercentage(this); });
         }
+
+        // --- SKILLS TAG LOGICA ---
+        const skillsInput = document.getElementById('skillsInput');
+        const skillsContainer = document.getElementById('skillsContainer');
+        const skillSelector = document.getElementById('skillSelector');
+
+        // Haal bestaande skills op (bij bewerken) en split op komma
+        let currentSkills = skillsInput.value ? skillsInput.value.split(',').filter(s => s.trim() !== '') : [];
+
+        function renderSkills() {
+            skillsContainer.innerHTML = ''; // Leegmaken
+            
+            currentSkills.forEach((skill, index) => {
+                const tag = document.createElement('div');
+                tag.className = 'skill-tag';
+                tag.innerHTML = `
+                    ${skill}
+                    <span class="remove-skill" onclick="removeSkill(${index})">&times;</span>
+                `;
+                skillsContainer.appendChild(tag);
+            });
+
+            // Update verborgen veld voor form submit
+            skillsInput.value = currentSkills.join(',');
+        }
+
+        function addSkill(skill) {
+            if (skill && !currentSkills.includes(skill)) {
+                currentSkills.push(skill);
+                renderSkills();
+            }
+            skillSelector.value = ""; // Reset dropdown
+        }
+
+        function removeSkill(index) {
+            currentSkills.splice(index, 1);
+            renderSkills();
+        }
+
+        // Initieel renderen (belangrijk bij bewerken)
+        renderSkills();
     </script>
 
 </body>
