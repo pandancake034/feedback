@@ -52,8 +52,15 @@ try {
         body { margin: 0; font-family: 'Segoe UI', sans-serif; background: var(--bg-body); color: var(--text-main); display: flex; height: 100vh; overflow: hidden; }
         * { box-sizing: border-box; }
 
-        /* Layout */
-        .sidebar { width: 240px; background: #1a2233; color: white; flex-shrink: 0; display: flex; flex-direction: column; }
+        /* --- SIDEBAR & LAYOUT CSS (Toegevoegd) --- */
+        .sidebar { width: 240px; background: #1a2233; color: white; display: flex; flex-direction: column; flex-shrink: 0; }
+        .sidebar-header { height: 60px; padding: 0 20px; display: flex; align-items: center; background: rgba(0,0,0,0.2); border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .sidebar-logo { max-height: 40px; }
+        .nav-list { list-style: none; padding: 20px 0; margin: 0; }
+        .nav-item a { display: flex; align-items: center; padding: 12px 20px; color: #b0b6c3; text-decoration: none; transition: 0.2s; font-size: 14px; }
+        .nav-item a:hover, .nav-item a.active { background: rgba(255,255,255,0.1); color: white; border-left: 4px solid var(--brand-color); }
+        .nav-item .material-icons-outlined { margin-right: 12px; }
+
         .main-content { flex-grow: 1; display: flex; flex-direction: column; overflow-y: auto; }
         .content-body { padding: 24px; max-width: 1000px; margin: 0 auto; width: 100%; }
 
