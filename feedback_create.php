@@ -2,7 +2,7 @@
 /**
  * FEEDBACK_CREATE.PHP
  * Module voor het inplannen van nieuwe feedback gesprekken.
- * Stijl: Enterprise (Oracle/Salesforce)
+ * Nu met optie om direct een NIEUWE chauffeur aan te maken.
  */
 
 // 1. CONFIGURATIE & BEVEILIGING
@@ -15,18 +15,18 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
-// 2. DATA OPHALEN VOOR DROPDOWNS
+// 2. DATA OPHALEN
 $drivers = [];
-$users   = []; // Voor 'toewijzen aan'
+$users   = []; 
 $error   = "";
-$success = "";
+$prefill_driver_id = $_GET['prefill_driver'] ?? null;
 
 try {
-    // Haal alle chauffeurs op (gesorteerd op naam)
+    // Haal chauffeurs op
     $stmt = $pdo->query("SELECT id, name, employee_id FROM drivers ORDER BY name ASC");
     $drivers = $stmt->fetchAll();
 
-    // Haal mogelijke teamleads/managers op voor toewijzing
+    // Haal teamleads op
     $stmtUsers = $pdo->query("SELECT id, email FROM users ORDER BY email ASC");
     $users = $stmtUsers->fetchAll();
 
@@ -34,44 +34,59 @@ try {
     $error = "Kon gegevens niet laden: " . $e->getMessage();
 }
 
-// 3. FORMULIER VERWERKING (POST REQUEST)
+// 3. FORMULIER VERWERKING
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     
-    // Validatie
-    if (empty($_POST['driver_id']) || empty($_POST['form_date'])) {
-        $error = "Vul in elk geval de chauffeur en de gespreksdatum in.";
-    } else {
-        try {
-            // Query voorbereiden
-            $sql = "INSERT INTO feedback_forms (
-                        driver_id, 
-                        created_by_user_id, 
-                        assigned_to_user_id, 
-                        form_date, 
-                        start_date, 
-                        agency, 
-                        status
-                    ) VALUES (?, ?, ?, ?, ?, ?, 'open')";
-            
-            $stmt = $pdo->prepare($sql);
-            
-            // Uitvoeren
-            $stmt->execute([
-                $_POST['driver_id'],
-                $_SESSION['user_id'],              // Gemaakt door (Huidige gebruiker)
-                $_POST['assigned_to'] ?: NULL,     // Toegewezen aan (of NULL)
-                $_POST['form_date'],
-                $_POST['start_date'],
-                $_POST['agency']
-            ]);
+    // Check of we een nieuwe chauffeur maken of een bestaande kiezen
+    $is_new_driver = isset($_POST['driver_mode']) && $_POST['driver_mode'] === 'new';
+    $driver_id = null;
 
-            // Succes! Stuur door naar dashboard of toon melding
-            header("Location: dashboard.php?msg=created");
-            exit;
+    try {
+        $pdo->beginTransaction(); // Start transactie voor veiligheid
 
-        } catch (PDOException $e) {
-            $error = "Fout bij opslaan: " . $e->getMessage();
+        // STAP A: Bepaal Driver ID
+        if ($is_new_driver) {
+            // Validatie voor nieuwe chauffeur
+            if (empty($_POST['new_driver_name']) || empty($_POST['new_employee_id'])) {
+                throw new Exception("Vul naam en personeelsnummer in voor de nieuwe chauffeur.");
+            }
+            
+            // Maak nieuwe chauffeur aan
+            $stmtNew = $pdo->prepare("INSERT INTO drivers (name, employee_id) VALUES (?, ?)");
+            $stmtNew->execute([trim($_POST['new_driver_name']), trim($_POST['new_employee_id'])]);
+            $driver_id = $pdo->lastInsertId();
+
+        } else {
+            // Bestaande chauffeur
+            if (empty($_POST['driver_id'])) {
+                throw new Exception("Kies een chauffeur uit de lijst.");
+            }
+            $driver_id = $_POST['driver_id'];
         }
+
+        // STAP B: Maak het formulier aan
+        $sql = "INSERT INTO feedback_forms (
+                    driver_id, created_by_user_id, assigned_to_user_id, 
+                    form_date, start_date, agency, status
+                ) VALUES (?, ?, ?, ?, ?, ?, 'open')";
+        
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([
+            $driver_id,
+            $_SESSION['user_id'],
+            $_POST['assigned_to'] ?: NULL,
+            $_POST['form_date'],
+            $_POST['start_date'],
+            $_POST['agency']
+        ]);
+
+        $pdo->commit(); // Alles opslaan
+        header("Location: dashboard.php?msg=created");
+        exit;
+
+    } catch (Exception $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        $error = "Fout: " . $e->getMessage();
     }
 }
 ?>
@@ -79,204 +94,153 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <html lang="nl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nieuw Gesprek | Chauffeurs Dossier</title>
-    
+    <title>Nieuw Gesprek</title>
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;600;700&display=swap" rel="stylesheet">
-
     <style>
-        /* --- HERGEBRUIKTE CSS VARIABELEN (Consistentie!) --- */
-        :root {
-            --brand-color: #0176d3;
-            --brand-dark: #014486;
-            --sidebar-bg: #1a2233;
-            --bg-body: #f3f2f2;
-            --text-main: #181818;
-            --text-secondary: #706e6b;
-            --border-color: #dddbda;
-            --card-shadow: 0 2px 2px 0 rgba(0,0,0,0.1);
-            --danger: #ea001e;
-        }
-
-        /* Basis Reset */
-        body { margin: 0; font-family: 'Segoe UI', system-ui, sans-serif; background-color: var(--bg-body); color: var(--text-main); display: flex; height: 100vh; overflow: hidden; }
+        /* --- STYLING (Hetzelfde als voorheen) --- */
+        :root { --brand-color: #0176d3; --brand-dark: #014486; --sidebar-bg: #1a2233; --bg-body: #f3f2f2; --text-main: #181818; --text-secondary: #706e6b; --border-color: #dddbda; }
+        body { margin: 0; font-family: 'Segoe UI', sans-serif; background: var(--bg-body); color: var(--text-main); display: flex; height: 100vh; overflow: hidden; }
         * { box-sizing: border-box; }
-
-        /* Sidebar & Main Layout (Exact kopie van Dashboard) */
-        .sidebar { width: 240px; background-color: var(--sidebar-bg); color: white; display: flex; flex-direction: column; flex-shrink: 0; }
-        .sidebar-header { height: 60px; display: flex; align-items: center; padding: 0 20px; font-size: 18px; font-weight: 700; border-bottom: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.2); }
-        .nav-list { list-style: none; padding: 20px 0; margin: 0; flex-grow: 1; }
-        .nav-item a { display: flex; align-items: center; padding: 12px 20px; color: #b0b6c3; text-decoration: none; transition: 0.2s; font-size: 14px; }
-        .nav-item a:hover { background-color: rgba(255,255,255,0.1); color: white; border-left: 4px solid var(--brand-color); }
-        .nav-item .material-icons-outlined { margin-right: 12px; font-size: 20px; }
-        
+        .sidebar { width: 240px; background: var(--sidebar-bg); color: white; display: flex; flex-direction: column; flex-shrink: 0; }
         .main-content { flex-grow: 1; display: flex; flex-direction: column; overflow-y: auto; }
-        .top-header { height: 60px; background: white; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; padding: 0 24px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); position: sticky; top: 0; z-index: 10; }
-        
-        .page-body { padding: 24px; max-width: 800px; margin: 0 auto; width: 100%; } /* Max-width toegevoegd voor formulier leesbaarheid */
-
-        /* --- FORMULIER SPECIFIEKE STIJLEN --- */
-        .page-header { margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; }
-        .page-header h1 { margin: 0; font-size: 24px; color: var(--text-main); }
-
-        .card { background: white; border: 1px solid var(--border-color); border-radius: 4px; box-shadow: var(--card-shadow); overflow: hidden; }
-        
-        /* Section Headers (Zoals in Salesforce formulieren) */
-        .form-section-title {
-            background-color: #f3f2f2;
-            padding: 10px 20px;
-            font-size: 14px;
-            font-weight: 700;
-            color: var(--text-main);
-            border-bottom: 1px solid var(--border-color);
-            margin-top: 0;
-        }
-
+        .page-body { padding: 24px; max-width: 800px; margin: 0 auto; width: 100%; }
+        .card { background: white; border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; margin-bottom: 20px; }
+        .form-section-title { background: #f3f2f2; padding: 10px 20px; font-weight: 700; border-bottom: 1px solid var(--border-color); margin: 0; }
         .card-body { padding: 20px; }
-
-        /* Form Grid */
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
         .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 6px; font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+        input, select { width: 100%; padding: 8px 12px; border: 1px solid #dddbda; border-radius: 4px; font-size: 14px; }
+        .btn { padding: 9px 16px; border-radius: 4px; font-size: 13px; font-weight: 600; cursor: pointer; text-decoration: none; border: none; }
+        .btn-save { background: var(--brand-color); color: white; float: right; }
+        .alert-error { background: #fde8e8; color: #ea001e; padding: 10px; border-radius: 4px; margin-bottom: 20px; border: 1px solid #fbd5d5; }
         
-        label { display: block; margin-bottom: 6px; font-size: 13px; color: var(--text-secondary); font-weight: 600; }
-        
-        /* Input Styling */
-        input[type="text"], input[type="date"], select {
-            width: 100%;
-            padding: 8px 12px;
-            border: 1px solid #dddbda;
-            border-radius: 4px;
-            font-size: 14px;
-            color: var(--text-main);
-            transition: border 0.2s;
-        }
-        input:focus, select:focus {
-            border-color: var(--brand-color);
-            outline: none;
-            box-shadow: 0 0 0 1px var(--brand-color);
-        }
-
-        /* Knoppen */
-        .btn-group { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border-color); }
-        .btn { padding: 9px 16px; border-radius: 4px; font-size: 13px; font-weight: 600; cursor: pointer; text-decoration: none; border: 1px solid transparent; }
-        .btn-cancel { background: white; border-color: var(--border-color); color: var(--text-main); }
-        .btn-save { background: var(--brand-color); color: white; }
-        .btn-save:hover { background-color: var(--brand-dark); }
-
-        /* Alerts */
-        .alert { padding: 12px; border-radius: 4px; margin-bottom: 20px; font-size: 13px; }
-        .alert-error { background-color: #fde8e8; color: var(--danger); border: 1px solid #fbd5d5; }
-
+        /* Toggle Switch Stijl */
+        .toggle-container { display: flex; gap: 15px; margin-bottom: 15px; }
+        .radio-label { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 14px; }
     </style>
 </head>
 <body>
 
-    <aside class="sidebar">
-        <div class="sidebar-header">
-            <span>LogistiekApp</span>
-        </div>
-        <ul class="nav-list">
-            <li class="nav-item">
-                <a href="dashboard.php">
-                    <span class="material-icons-outlined">dashboard</span>
-                    Dashboard
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="#" class="active"> <span class="material-icons-outlined">assignment</span>
-                    Nieuw Gesprek
-                </a>
-            </li>
-        </ul>
-    </aside>
+    <?php include __DIR__ . '/includes/sidebar.php'; ?>
 
     <main class="main-content">
-        
-        <header class="top-header">
-            <div style="font-weight: 600; font-size: 14px; color: var(--text-secondary);">Feedback Module</div>
-            <div style="font-size: 13px; font-weight: 600;">
-                <?php echo htmlspecialchars($_SESSION['email']); ?>
-            </div>
-        </header>
+        <?php include __DIR__ . '/includes/header.php'; ?>
 
         <div class="page-body">
-            
-            <div class="page-header">
-                <h1>Nieuw Feedback Gesprek</h1>
-            </div>
+            <h1 style="margin-bottom: 20px;">Nieuw Feedback Gesprek</h1>
 
             <?php if (!empty($error)): ?>
-                <div class="alert alert-error">
-                    <span class="material-icons-outlined" style="vertical-align: bottom; font-size: 16px;">error</span> 
-                    <?php echo htmlspecialchars($error); ?>
-                </div>
+                <div class="alert alert-error"><?php echo htmlspecialchars($error); ?></div>
             <?php endif; ?>
 
-            <form method="POST" action="feedback_create.php">
+            <form method="POST">
                 <div class="card">
-                    
-                    <h3 class="form-section-title">Informatie</h3>
+                    <h3 class="form-section-title">1. Kies Chauffeur</h3>
                     <div class="card-body">
-                        <div class="form-grid">
+                        
+                        <div class="form-group">
+                            <label>Wie wil je bespreken?</label>
+                            <div class="toggle-container">
+                                <label class="radio-label">
+                                    <input type="radio" name="driver_mode" value="existing" checked onclick="toggleMode('existing')">
+                                    Bestaande chauffeur
+                                </label>
+                                <label class="radio-label">
+                                    <input type="radio" name="driver_mode" value="new" onclick="toggleMode('new')">
+                                    + Nieuwe chauffeur toevoegen
+                                </label>
+                            </div>
+                        </div>
+
+                        <div id="block-existing">
                             <div class="form-group">
-                                <label for="driver_id">Chauffeur *</label>
-                                <select name="driver_id" id="driver_id" required>
-                                    <option value="">-- Selecteer Chauffeur --</option>
-                                    <?php foreach ($drivers as $driver): ?>
-                                        <option value="<?php echo $driver['id']; ?>">
-                                            <?php echo htmlspecialchars($driver['name']); ?> (<?php echo htmlspecialchars($driver['employee_id'] ?? ''); ?>)
+                                <label>Selecteer uit lijst</label>
+                                <select name="driver_id">
+                                    <option value="">-- Zoek chauffeur --</option>
+                                    <?php foreach ($drivers as $d): ?>
+                                        <option value="<?php echo $d['id']; ?>" <?php if($prefill_driver_id == $d['id']) echo 'selected'; ?>>
+                                            <?php echo htmlspecialchars($d['name']); ?> (<?php echo htmlspecialchars($d['employee_id'] ?? ''); ?>)
                                         </option>
                                     <?php endforeach; ?>
                                 </select>
                             </div>
+                        </div>
 
-                            <div class="form-group">
-                                <label for="agency">Uitzendbureau</label>
-                                <input type="text" name="agency" id="agency" value="YoungCapital">
+                        <div id="block-new" style="display: none;">
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label>Volledige Naam</label>
+                                    <input type="text" name="new_driver_name" placeholder="Bijv. Piet Jansen">
+                                </div>
+                                <div class="form-group">
+                                    <label>Personeelsnummer</label>
+                                    <input type="text" name="new_employee_id" placeholder="Bijv. 12345">
+                                </div>
                             </div>
                         </div>
+
+                        <div class="form-group">
+                            <label>Uitzendbureau</label>
+                            <input type="text" name="agency" value="YoungCapital">
+                        </div>
+
                     </div>
 
-                    <h3 class="form-section-title">Planning & Toewijzing</h3>
+                    <h3 class="form-section-title">2. Planning</h3>
                     <div class="card-body">
                         <div class="form-grid">
-                            
                             <div class="form-group">
-                                <label for="form_date">Datum Gesprek *</label>
-                                <input type="date" name="form_date" id="form_date" required value="<?php echo date('Y-m-d'); ?>">
+                                <label>Datum Gesprek</label>
+                                <input type="date" name="form_date" required value="<?php echo date('Y-m-d'); ?>">
                             </div>
-
                             <div class="form-group">
-                                <label for="start_date">Startdatum Periode *</label>
-                                <input type="date" name="start_date" id="start_date" required value="<?php echo date('Y-m-d', strtotime('-1 week')); ?>">
+                                <label>Startdatum Periode</label>
+                                <input type="date" name="start_date" required value="<?php echo date('Y-m-d', strtotime('-1 week')); ?>">
                             </div>
-
                             <div class="form-group">
-                                <label for="assigned_to">Toewijzen aan (Teamlead/Manager)</label>
-                                <select name="assigned_to" id="assigned_to">
-                                    <option value="">-- Mijzelf (<?php echo htmlspecialchars($_SESSION['email']); ?>) --</option>
-                                    <?php foreach ($users as $user): ?>
-                                        <option value="<?php echo $user['id']; ?>">
-                                            <?php echo htmlspecialchars($user['email']); ?>
-                                        </option>
+                                <label>Toewijzen aan</label>
+                                <select name="assigned_to">
+                                    <option value="">-- Mijzelf --</option>
+                                    <?php foreach ($users as $u): ?>
+                                        <option value="<?php echo $u['id']; ?>"><?php echo htmlspecialchars($u['email']); ?></option>
                                     <?php endforeach; ?>
                                 </select>
                             </div>
-
                         </div>
 
-                        <div class="btn-group">
-                            <a href="dashboard.php" class="btn btn-cancel">Annuleren</a>
-                            <button type="submit" class="btn btn-save">Gesprek Aanmaken</button>
+                        <div style="text-align: right; padding-top: 10px; border-top: 1px solid #eee;">
+                            <a href="dashboard.php" style="color: #666; text-decoration: none; margin-right: 15px; font-size: 13px;">Annuleren</a>
+                            <button type="submit" class="btn btn-save">Gesprek Starten</button>
                         </div>
                     </div>
-
                 </div>
             </form>
-
         </div>
     </main>
+
+    <script>
+        function toggleMode(mode) {
+            const blockExisting = document.getElementById('block-existing');
+            const blockNew = document.getElementById('block-new');
+            
+            if (mode === 'new') {
+                blockExisting.style.display = 'none';
+                blockNew.style.display = 'block';
+                // Velden verplicht maken als ze zichtbaar zijn helpt browser validatie
+                document.querySelector('[name="new_driver_name"]').required = true;
+                document.querySelector('[name="new_employee_id"]').required = true;
+                document.querySelector('[name="driver_id"]').required = false;
+            } else {
+                blockExisting.style.display = 'block';
+                blockNew.style.display = 'none';
+                document.querySelector('[name="new_driver_name"]').required = false;
+                document.querySelector('[name="new_employee_id"]').required = false;
+                document.querySelector('[name="driver_id"]').required = true;
+            }
+        }
+    </script>
 
 </body>
 </html>
