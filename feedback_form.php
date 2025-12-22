@@ -277,7 +277,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         
                         <?php if ($is_new): ?>
                             <div class="form-group">
-                                <label style="margin-bottom:8px;">Wie wil je bespreken?</label>
+                                <label style="margin-bottom:8px;">Wie wil je een gesprek?</label>
                                 <div class="toggle-wrapper">
                                     <input type="radio" name="driver_mode" id="mode_existing" value="existing" checked onclick="toggleDriverMode('existing')">
                                     <label for="mode_existing" class="toggle-option">Bestaande chauffeur</label>
@@ -288,7 +288,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                             </div>
 
                             <div id="block-existing" class="form-group" style="margin-top: 15px;">
-                                <label>Selecteer Chauffeur *</label>
+                                <label>Selecteer chauffeur *</label>
                                 <select name="existing_driver_id">
                                     <option value="">-- Kies uit lijst --</option>
                                     <?php foreach ($drivers as $d): ?>
@@ -299,7 +299,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
                             <div id="block-new" class="form-grid hidden" style="margin-top: 15px;">
                                 <div class="form-group">
-                                    <label>Naam Chauffeur *</label>
+                                    <label>Naam chauffeur *</label>
                                     <input type="text" name="driver_name" placeholder="Bijv. Jan Jansen">
                                 </div>
                                 <div class="form-group">
@@ -311,7 +311,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         <?php else: ?>
                             <div class="form-grid">
                                 <div class="form-group">
-                                    <label>Naam Chauffeur *</label>
+                                    <label>Naam chauffeur *</label>
                                     <input type="text" name="driver_name" value="<?php echo htmlspecialchars($data['driver_name']); ?>" required>
                                 </div>
                                 <div class="form-group">
