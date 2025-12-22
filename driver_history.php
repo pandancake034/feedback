@@ -129,7 +129,7 @@ try {
                         <span class="material-icons-outlined">arrow_back</span> Terug
                     </a>
                     <a href="feedback_create.php?prefill_driver=<?php echo $driver['id']; ?>" class="btn btn-primary">
-                        <span class="material-icons-outlined">add</span> Nieuw Gesprek
+                        <span class="material-icons-outlined">add</span> Nieuw
                     </a>
                 </div>
             </div>
