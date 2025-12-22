@@ -3,6 +3,7 @@
  * FEEDBACK_VIEW.PHP
  * High-end versie: Visualisaties, Steppers, CSRF, Avatar.
  * Update: CHAT LAYOUT (WhatsApp style) voor notities.
+ * Update: Naam in header is nu klikbaar naar driver_history.php
  */
 
 require_once __DIR__ . '/config/config.php';
@@ -77,14 +78,6 @@ try {
                                 FROM notes n 
                                 JOIN users u ON n.user_id = u.id 
                                 WHERE n.driver_id = ? 
-                                ORDER BY n.note_date ASC"); // LET OP: ASC voor Chat volgorde (oud naar nieuw) of DESC voor nieuwste boven.
-                                // Voor echte chat is ASC (oudste boven, nieuwste onder) logischer, maar bij dossiers vaak nieuwste boven.
-                                // Ik laat hem op DESC staan (nieuwste boven) omdat dat handig is bij dossiers. 
-                                // Wil je het andersom (onderaan typen)? Verander dan naar ASC.
-    $stmtNotes = $pdo->prepare("SELECT n.*, u.id as user_id, u.email, u.first_name, u.last_name 
-                                FROM notes n 
-                                JOIN users u ON n.user_id = u.id 
-                                WHERE n.driver_id = ? 
                                 ORDER BY n.note_date DESC"); 
     $stmtNotes->execute([$form['driver_id']]);
     $notes = $stmtNotes->fetchAll(PDO::FETCH_ASSOC);
@@ -136,6 +129,10 @@ function getInitials($name) {
             color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; 
             font-size: 24px; font-weight: 700; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border: 3px solid white;
         }
+        
+        /* KLIKBARE NAAM CSS */
+        .profile-link { color: var(--text-main); text-decoration: none; transition: color 0.2s; }
+        .profile-link:hover { color: var(--brand-color); text-decoration: underline; }
 
         /* DETAILS & PROGRESS */
         .detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
@@ -160,73 +157,26 @@ function getInitials($name) {
 
         /* --- CHAT STYLES (NIEUW) --- */
         .chat-container { display: flex; flex-direction: column; gap: 15px; padding-bottom: 20px; }
-        
-        /* De rij die het bericht bevat */
         .chat-row { display: flex; align-items: flex-end; gap: 10px; width: 100%; }
-        
-        /* MIJN bericht (Rechts) */
         .chat-row.me { justify-content: flex-end; }
-        
-        /* COLLEGA bericht (Links) */
         .chat-row.other { justify-content: flex-start; }
-
-        /* Avatar in chat */
-        .chat-avatar {
-            width: 32px; height: 32px; flex-shrink: 0;
-            background: #e0e7ff; color: var(--brand-color);
-            border-radius: 50%; display: flex; align-items: center; justify-content: center;
-            font-size: 11px; font-weight: 700;
-            border: 1px solid white; box-shadow: 0 1px 2px rgba(0,0,0,0.1);
-        }
-        /* Avatar voor mijzelf mag iets anders kleuren */
+        .chat-avatar { width: 32px; height: 32px; flex-shrink: 0; background: #e0e7ff; color: var(--brand-color); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; border: 1px solid white; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
         .chat-row.me .chat-avatar { background: var(--brand-dark); color: white; }
-
-        /* De bubbel zelf */
-        .chat-bubble {
-            max-width: 80%;
-            padding: 10px 14px;
-            position: relative;
-            font-size: 13px;
-            line-height: 1.4;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-        }
-
-        /* Styling voor MIJ (Blauw) */
-        .chat-row.me .chat-bubble {
-            background-color: var(--brand-color);
-            color: white;
-            border-radius: 12px 12px 0 12px; /* Linksonder scherp */
-        }
-        
-        /* Styling voor ANDER (Grijs) */
-        .chat-row.other .chat-bubble {
-            background-color: #f3f4f6; /* Lichtgrijs */
-            color: var(--text-main);
-            border: 1px solid #eee;
-            border-radius: 12px 12px 12px 0; /* Rechtsonder scherp */
-        }
-
-        /* Header in de bubbel (Naam + Datum) */
-        .chat-meta {
-            display: flex; justify-content: space-between; align-items: center;
-            margin-bottom: 4px; font-size: 11px; gap: 10px;
-        }
+        .chat-bubble { max-width: 80%; padding: 10px 14px; position: relative; font-size: 13px; line-height: 1.4; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        .chat-row.me .chat-bubble { background-color: var(--brand-color); color: white; border-radius: 12px 12px 0 12px; }
+        .chat-row.other .chat-bubble { background-color: #f3f4f6; color: var(--text-main); border: 1px solid #eee; border-radius: 12px 12px 12px 0; }
+        .chat-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; font-size: 11px; gap: 10px; }
         .chat-row.me .chat-meta { color: rgba(255,255,255, 0.8); }
         .chat-row.other .chat-meta { color: #999; }
         .chat-name { font-weight: 700; }
-
-        /* Acties (Edit/Delete) */
         .chat-actions { display: inline-flex; gap: 5px; opacity: 0; transition: 0.2s; margin-left: 8px; }
         .chat-bubble:hover .chat-actions { opacity: 1; }
         .chat-action-icon { cursor: pointer; font-size: 14px; }
-        
         .chat-row.me .chat-action-icon { color: rgba(255,255,255, 0.9); }
         .chat-row.me .chat-action-icon:hover { color: white; font-weight: bold; }
-        
         .chat-row.other .chat-action-icon { color: #999; }
         .chat-row.other .chat-action-icon:hover { color: var(--brand-color); }
         .chat-row.other .chat-action-icon.delete:hover { color: #c53030; }
-
 
         /* Forms & Buttons */
         .note-input { width: 100%; border: 1px solid var(--border-color); border-radius: 4px; padding: 12px; font-family: inherit; font-size: 13px; resize: vertical; min-height: 80px; transition: 0.2s; }
@@ -287,7 +237,11 @@ function getInitials($name) {
                     <div class="profile-info">
                         <div class="profile-avatar no-print"><?php echo getInitials($form['driver_name']); ?></div>
                         <div>
-                            <h1 style="margin: 0; font-size: 24px; color: var(--text-main);"><?php echo htmlspecialchars($form['driver_name']); ?></h1>
+                            <h1 style="margin: 0; font-size: 24px;">
+                                <a href="driver_history.php?driver_id=<?php echo $form['driver_id']; ?>" class="profile-link">
+                                    <?php echo htmlspecialchars($form['driver_name']); ?>
+                                </a>
+                            </h1>
                             <span style="font-size: 13px; color: var(--text-light); display: block; margin-top: 4px;">
                                 ID: <?php echo htmlspecialchars($form['employee_id']); ?> • 
                                 Gesprek: <?php echo date('d-m-Y', strtotime($form['form_date'])); ?>
