@@ -5,8 +5,9 @@ require_once 'config/db.php';
 
 // Check of gebruiker al is ingelogd
 if (isset($_SESSION['user_id']) && empty($_POST)) {
-    header("Location: dashboard.php");
-    exit;
+    header("Location: /feedback/dashboard.php");
+exit;
+
 }
 
 $error_message = "";
