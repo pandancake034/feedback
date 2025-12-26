@@ -9,7 +9,7 @@ require_once __DIR__ . '/../config/db.php';
 
 // 1. BEVEILIGING & ROL CHECK
 if (!isset($_SESSION['user_id'])) {
-    header("Location: ../login.php");
+    header("Location: ../index.php");
     exit;
 }
 // Alleen admins mogen hier komen
