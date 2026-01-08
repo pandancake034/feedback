@@ -381,7 +381,7 @@ if (isset($_GET['ajax_pagination'])) {
     
     <a href="feedback_form.php" style="background-color: var(--brand-color); color: white; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px;">
         <span class="material-icons-outlined" style="font-size: 18px;">add</span>
-        Nieuw gesprek
+        nieuw
     </a>
 </div>
 
@@ -392,9 +392,9 @@ if (isset($_GET['ajax_pagination'])) {
                                 <th>Datum</th>
                                 <th>Chauffeur</th>
                                 <th>Moment</th>
-                                <th>Gemaakt Door</th>
+                                <th>Gemaakt door</th>
                                 <th>Status</th>
-                                <th>Toegewezen Aan</th>
+                                <th>Toegewezen aan</th>
                                 <th style="text-align:right;">Actie</th>
                             </tr>
                         </thead>
