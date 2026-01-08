@@ -115,7 +115,7 @@ if (isset($_GET['msg'])) {
 <html lang="nl">
 <head>
     <meta charset="UTF-8">
-    <title>Admin Beheer - <?php echo defined('APP_TITLE') ? APP_TITLE : 'LogistiekApp'; ?></title>
+    <title>Admin FeedbackFlow - <?php echo defined('APP_TITLE') ? APP_TITLE : 'LogistiekApp'; ?></title>
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;600;700&display=swap" rel="stylesheet">
 
@@ -207,7 +207,7 @@ if (isset($_GET['msg'])) {
             </li>
             <li class="nav-item">
                 <a href="index.php" class="active">
-                    <span class="material-icons-outlined">admin_panel_settings</span> Beheer & Admin
+                    <span class="material-icons-outlined">admin_panel_settings</span> Beheer & admin
                 </a>
             </li>
         </ul>
@@ -217,7 +217,7 @@ if (isset($_GET['msg'])) {
         <header class="top-header">
             <div style="font-size: 13px; font-weight: 600; display:flex; align-items:center; gap:8px;">
                 <span class="material-icons-outlined">account_circle</span>
-                <?php echo htmlspecialchars($_SESSION['email']); ?> (Admin)
+                <?php echo htmlspecialchars($_SESSION['email']); ?> (admin)
                 <a href="../logout.php" style="margin-left:15px; color:var(--text-secondary); text-decoration:none;"><span class="material-icons-outlined">logout</span></a>
             </div>
         </header>
@@ -225,7 +225,7 @@ if (isset($_GET['msg'])) {
         <div class="page-body">
             
             <div style="margin-bottom: 24px;">
-                <h1 style="margin: 0; font-size: 24px;">Systeembeheer</h1>
+                <h1 style="margin: 0; font-size: 24px;">Beheer</h1>
                 <div style="color: var(--text-secondary); font-size: 13px;">Beheer gebruikers, bekijk statistieken en schoon dossiers op.</div>
             </div>
 
@@ -247,7 +247,7 @@ if (isset($_GET['msg'])) {
                 </button>
                 <button class="tab-btn <?php echo ($activeTab === 'dossiers') ? 'active' : ''; ?>" onclick="openTab('dossiers')">
                     <span class="material-icons-outlined" style="vertical-align:middle; font-size:18px; margin-right:6px;">folder_delete</span>
-                    Dossiers & Opruimen
+                    Dossiers
                 </button>
                 <button class="tab-btn <?php echo ($activeTab === 'stats') ? 'active' : ''; ?>" onclick="openTab('stats')">
                     <span class="material-icons-outlined" style="vertical-align:middle; font-size:18px; margin-right:6px;">insights</span>
@@ -258,9 +258,9 @@ if (isset($_GET['msg'])) {
             <div id="tab-users" class="tab-content <?php echo ($activeTab === 'users') ? 'active' : ''; ?>">
                 <div class="card">
                     <div class="card-header">
-                        <span>Alle Gebruikers</span>
+                        <span>Alle gebruikers</span>
                         <button onclick="openModal('create')" class="btn btn-brand">
-                            <span class="material-icons-outlined" style="font-size:16px;">add</span> Nieuw
+                            <span class="material-icons-outlined" style="font-size:16px;">add</span> nieuw
                         </button>
                     </div>
                     <div style="overflow-x: auto;">
@@ -268,9 +268,9 @@ if (isset($_GET['msg'])) {
                             <thead>
                                 <tr>
                                     <th>Naam</th>
-                                    <th>E-mailadres</th>
+                                    <th>E-mail</th>
                                     <th>Rol</th>
-                                    <th>Laatst Ingelogd</th>
+                                    <th>Laatst ingelogd</th>
                                     <th style="text-align: right;">Acties</th>
                                 </tr>
                             </thead>
@@ -313,7 +313,7 @@ if (isset($_GET['msg'])) {
             <div id="tab-dossiers" class="tab-content <?php echo ($activeTab === 'dossiers') ? 'active' : ''; ?>">
                 <div class="card">
                     <div class="card-header">
-                        Alle Dossiers (Definitief Verwijderen)
+                        Overzicht dossiers (definitief verwijderen)
                     </div>
                     <div style="overflow-x: auto;">
                         <table>
@@ -321,7 +321,7 @@ if (isset($_GET['msg'])) {
                                 <tr>
                                     <th>Datum</th>
                                     <th>Chauffeur</th>
-                                    <th>Personeelsnr</th>
+                                    <th>DriverID</th>
                                     <th>Status</th>
                                     <th>Gemaakt door</th>
                                     <th style="text-align: right;">Actie</th>
@@ -410,7 +410,7 @@ if (isset($_GET['msg'])) {
                     <div class="form-group">
                         <label>Rol</label>
                         <select name="role" id="inputRole" class="form-control">
-                            <option value="user">Gebruiker (Teamlead)</option>
+                            <option value="user">Gebruiker</option>
                             <option value="admin">Administrator</option>
                         </select>
                     </div>
