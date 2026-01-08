@@ -9,7 +9,7 @@ $is_admin_page = strpos($_SERVER['REQUEST_URI'], '/admin/') !== false;
 $is_admin = (isset($_SESSION['role']) && $_SESSION['role'] === 'admin');
 ?>
 <aside class="sidebar">
-    <div class="sidebar-header bg-white flex items-center justify-center p-4">
+    <div class="sidebar-header bg-white flex items-center justify-center p-4" style="background-color: #ffffff; border-bottom: 1px solid #dddbda;">
         <a href="<?php echo BASE_URL; ?>/dashboard.php" style="text-decoration:none; border:none;">
             <img src="https://i.imgur.com/qGySlgO.png" alt="LogistiekApp" class="sidebar-logo">
         </a>
