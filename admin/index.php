@@ -196,7 +196,7 @@ if (isset($_GET['msg'])) {
 <body>
 
     <aside class="sidebar">
-        <div class="sidebar-header">
+        <div class="sidebar-header bg-white flex items-center justify-center p-4">
             <img src="https://i.imgur.com/qGySlgO.png" alt="LogistiekApp" class="sidebar-logo">
         </div>
         <ul class="nav-list">
