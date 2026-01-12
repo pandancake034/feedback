@@ -24,6 +24,13 @@ $is_admin = (isset($_SESSION['role']) && $_SESSION['role'] === 'admin');
         </li>
 
         <li class="nav-item">
+            <a href="<?php echo BASE_URL; ?>/dashboard.php" class="<?php echo ($current_page == 'feedback_overview.php') ? 'active' : ''; ?>">
+                <span class="material-icons-outlined">summarize</span>
+                Home
+            </a>
+        </li>
+
+        <li class="nav-item">
             <a href="<?php echo BASE_URL; ?>/feedback_form.php" class="<?php echo ($current_page == 'feedback_form.php' || $current_page == 'feedback_create.php') ? 'active' : ''; ?>">
                 <span class="material-icons-outlined">add_circle</span>
                 Nieuw gesprek
