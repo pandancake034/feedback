@@ -314,14 +314,14 @@ function getInitials($name) {
 
                             <div style="margin-bottom: 24px;">
                                 <div class="label">Besproken punten & Vragen</div>
-                                <div class="value" style="background:#f9f9f9; padding:15px; border-radius:4px; border:1px solid #eee;">
+                                <div class="value" style="background:#f9f9f9; padding:15px; border-radius:4px; border:1px solid #eee; text-align: left;">
                                     <?php echo nl2br(htmlspecialchars($form['general_comments'] ?: 'Geen notities.')); ?>
                                 </div>
                             </div>
 
                             <div style="margin-bottom: 24px;">
                                 <div class="label">Gemaakte Afspraken</div>
-                                <div class="value" style="background:#f0fdf4; color:#166534; padding:15px; border-radius:4px; border:1px solid #bbf7d0;">
+                                <div class="value" style="background:#f0fdf4; color:#166534; padding:15px; border-radius:4px; border:1px solid #bbf7d0; text-align: left;">
                                     <span class="material-icons-outlined" style="font-size:16px; vertical-align:middle; margin-right:5px;">handshake</span>
                                     <?php echo nl2br(htmlspecialchars($form['agreements'] ?: 'Geen afspraken vastgelegd.')); ?>
                                 </div>
@@ -330,7 +330,7 @@ function getInitials($name) {
                             <?php if(!empty($form['misc_comments'])): ?>
                             <div>
                                 <div class="label">Overige opmerkingen</div>
-                                <div class="value"><?php echo nl2br(htmlspecialchars($form['misc_comments'])); ?></div>
+                                <div class="value" style="text-align: left;"><?php echo nl2br(htmlspecialchars($form['misc_comments'])); ?></div>
                             </div>
                             <?php endif; ?>
                         </div>
