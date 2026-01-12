@@ -282,7 +282,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 <?php endif; ?>
 
                 <div class="card">
-                    <h3 class="form-section-title"><span class="material-icons-outlined">person</span> 1. Chauffeur & Planning</h3>
+                    <h3 class="form-section-title"><span class="material-icons-outlined">person</span> 1. Chauffeur & planning</h3>
                     <div class="card-body">
                         
                         <?php if ($is_new): ?>
@@ -361,7 +361,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     <div class="card">
                         <h3 class="form-section-title"><span class="material-icons-outlined">psychology</span> 3. Gedrag & Beoordeling</h3>
                         <div class="card-body">
-                            <div class="form-group"><label>Rijgedrag & Communicatie</label><textarea name="driving_behavior"><?php echo htmlspecialchars($data['driving_behavior']); ?></textarea></div>
+                            <div class="form-group"><label>Rijgedrag & communicatie</label><textarea name="driving_behavior"><?php echo htmlspecialchars($data['driving_behavior']); ?></textarea></div>
                             <div class="form-group"><label>Waarschuwingen</label><textarea name="warnings" style="border-color: #fca5a5;"><?php echo htmlspecialchars($data['warnings']); ?></textarea></div>
                             <div class="form-group"><label>Complimenten</label><textarea name="client_compliment" style="border-color: #86efac;"><?php echo htmlspecialchars($data['client_compliment']); ?></textarea></div>
                             <div class="form-grid">
