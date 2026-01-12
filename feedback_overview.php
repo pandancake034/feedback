@@ -15,7 +15,7 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 // 2. CONFIGURATIE VOOR HEADER & PAGINERING
-$page_title = 'Alle Gesprekken'; 
+$page_title = 'Feedback overzicht'; 
 $limit = 15; 
 $page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int)$_GET['page'] : 1;
 if ($page < 1) $page = 1;
@@ -153,9 +153,9 @@ function get_page_link($pageNum) {
         <div class="page-body">
             
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <h1 style="margin: 0; font-size: 24px;">Alle Gesprekken</h1>
+                <h1 style="margin: 0; font-size: 24px;">Overzicht</h1>
                 <a href="feedback_create.php" style="background: var(--brand-color); color: white; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-weight: 600; display: flex; align-items: center; gap: 6px; font-size: 14px;">
-                    <span class="material-icons-outlined">add</span> Nieuw gesprek
+                    <span class="material-icons-outlined">add</span> nieuw
                 </a>
             </div>
 
