@@ -24,7 +24,7 @@ $is_admin = (isset($_SESSION['role']) && $_SESSION['role'] === 'admin');
         </li>
 
         <li class="nav-item">
-            <a href="<?php echo BASE_URL; ?>/dashboard.php" class="<?php echo ($current_page == 'feedback_overview.php') ? 'active' : ''; ?>">
+            <a href="<?php echo BASE_URL; ?>/feedback_overview.php" class="<?php echo ($current_page == 'feedback_overview.php') ? 'active' : ''; ?>">
                 <span class="material-icons-outlined">summarize</span>
                 Overzicht
             </a>
