@@ -14,13 +14,14 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
-// 2. FILTERS & PAGINERING INSTELLINGEN
-$limit = 15; // Aantal items per pagina
+// 2. CONFIGURATIE VOOR HEADER & PAGINERING
+$page_title = 'Alle Gesprekken'; // Zorgt dat de header de titel toont
+$limit = 15; 
 $page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int)$_GET['page'] : 1;
 if ($page < 1) $page = 1;
 $offset = ($page - 1) * $limit;
 
-// Filters ophalen uit URL
+// Filters ophalen
 $filter_status = $_GET['status'] ?? '';
 $filter_assigned = $_GET['assigned_to'] ?? '';
 
@@ -33,7 +34,6 @@ try {
 }
 
 // 4. QUERY OPBOUWEN
-// We bouwen de WHERE clause dynamisch op basis van de filters
 $whereSQL = "WHERE 1=1";
 $params = [];
 
@@ -47,24 +47,20 @@ if (!empty($filter_assigned)) {
     $params[] = $filter_assigned;
 }
 
-// 5. DATA OPHALEN: TOTALEN & RIJEN
+// 5. DATA OPHALEN
 $totalRows = 0;
 $feedbacks = [];
 
 try {
-    // A. Totaal aantal tellen (voor paginering)
-    $countQuery = "SELECT COUNT(*) 
-                   FROM feedback_forms f 
-                   $whereSQL";
+    // Totaal tellen
+    $countQuery = "SELECT COUNT(*) FROM feedback_forms f $whereSQL";
     $stmtCount = $pdo->prepare($countQuery);
     $stmtCount->execute($params);
     $totalRows = $stmtCount->fetchColumn();
     
-    // Bereken totaal aantal pagina's
     $totalPages = ceil($totalRows / $limit);
 
-    // B. De daadwerkelijke data ophalen
-    // We gebruiken LEFT JOINs om gebruikersdata op te halen (maker & toegewezene)
+    // Data ophalen
     $dataQuery = "SELECT 
                     f.id, f.form_date, f.review_moment, f.status, f.created_at,
                     d.id as driver_id, d.name as driver_name, d.employee_id,
@@ -86,7 +82,7 @@ try {
     die("Database fout: " . $e->getMessage());
 }
 
-// Helper functie om URL te behouden bij pagineren
+// Helper voor paginering links (behoudt filters)
 function get_page_link($pageNum) {
     $params = $_GET;
     $params['page'] = $pageNum;
@@ -97,7 +93,7 @@ function get_page_link($pageNum) {
 <html lang="nl">
 <head>
     <meta charset="UTF-8">
-    <title>Overzicht Gesprekken - <?php echo APP_TITLE; ?></title>
+    <title><?php echo $page_title; ?> - <?php echo defined('APP_TITLE') ? APP_TITLE : 'App'; ?></title>
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
@@ -106,28 +102,30 @@ function get_page_link($pageNum) {
         body { margin: 0; font-family: 'Segoe UI', sans-serif; background: var(--bg-body); color: var(--text-main); display: flex; height: 100vh; overflow: hidden; }
         * { box-sizing: border-box; }
 
+        /* Layout */
         .sidebar { width: 240px; background: #1a2233; color: white; display: flex; flex-direction: column; flex-shrink: 0; }
         .main-content { flex-grow: 1; display: flex; flex-direction: column; overflow-y: auto; }
+        .top-header { height: 60px; background: white; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; padding: 0 24px; position: sticky; top: 0; z-index: 10; flex-shrink: 0; }
         .page-body { padding: 24px; max-width: 1400px; margin: 0 auto; width: 100%; }
 
         .card { background: white; border: 1px solid var(--border-color); border-radius: 4px; box-shadow: 0 2px 2px rgba(0,0,0,0.1); margin-bottom: 24px; }
         
-        /* Filter Bar Styles */
+        /* Filter Bar */
         .filter-bar { padding: 16px; border-bottom: 1px solid var(--border-color); display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap; background: #fcfcfc; }
         .filter-group { display: flex; flex-direction: column; gap: 4px; }
         .filter-group label { font-size: 12px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; }
         .filter-select { padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; min-width: 150px; font-size: 14px; }
         .btn-filter { background: var(--brand-color); color: white; border: none; padding: 9px 16px; border-radius: 4px; font-weight: 600; cursor: pointer; font-size: 14px; }
-        .btn-reset { background: white; border: 1px solid var(--border-color); color: var(--text-main); padding: 9px 16px; border-radius: 4px; font-weight: 600; cursor: pointer; text-decoration: none; font-size: 14px; display: inline-block; }
+        .btn-reset { background: white; border: 1px solid var(--border-color); color: var(--text-main); padding: 9px 16px; border-radius: 4px; font-weight: 600; cursor: pointer; text-decoration: none; font-size: 14px; }
         .btn-reset:hover { background: #f3f2f2; }
 
-        /* Table Styles */
+        /* Table */
         table { width: 100%; border-collapse: collapse; font-size: 13px; }
         th { text-align: left; padding: 12px; border-bottom: 1px solid var(--border-color); color: var(--text-secondary); font-weight: 600; text-transform: uppercase; font-size: 11px; background: #fafafa; }
         td { padding: 12px; border-bottom: 1px solid #eee; vertical-align: middle; color: var(--text-main); }
         tr:hover td { background-color: #f9f9f9; }
 
-        /* Status Badges */
+        /* Badges */
         .status-badge { padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; text-transform: uppercase; display: inline-block; }
         .bg-open { background: #fffbeb; color: #b45309; border: 1px solid #fcd34d; }
         .bg-completed { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
@@ -138,8 +136,6 @@ function get_page_link($pageNum) {
         .page-link:hover { background: #f3f2f2; }
         .page-info { color: var(--text-secondary); font-size: 13px; }
         .disabled { opacity: 0.5; pointer-events: none; }
-
-        /* Icon Button */
         .btn-icon { color: #706e6b; text-decoration: none; padding: 4px; border-radius: 4px; transition: 0.2s; }
         .btn-icon:hover { background: #eee; color: var(--brand-color); }
     </style>
@@ -149,17 +145,11 @@ function get_page_link($pageNum) {
     <?php include __DIR__ . '/includes/sidebar.php'; ?>
 
     <main class="main-content">
+        
         <?php include __DIR__ . '/includes/header.php'; ?>
 
         <div class="page-body">
             
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <h1 style="margin: 0; font-size: 24px;">Overzicht Gesprekken</h1>
-                <a href="feedback_create.php" style="background: var(--brand-color); color: white; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-weight: 600; display: flex; align-items: center; gap: 6px; font-size: 14px;">
-                    <span class="material-icons-outlined">add</span> Nieuw gesprek
-                </a>
-            </div>
-
             <div class="card">
                 <form method="GET" class="filter-bar">
                     <div class="filter-group">
