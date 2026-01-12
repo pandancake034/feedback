@@ -399,7 +399,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 </div>
 
                 <div class="card">
-                    <h3 class="form-section-title">3. Gedrag & Beoordeling</h3>
+                    <h3 class="form-section-title">3. Gedrag & beoordeling</h3>
                     <div class="card-body">
                         <div class="form-group">
                             <label>Rijgedrag & Communicatie</label>
