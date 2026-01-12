@@ -2,7 +2,7 @@
 /**
  * FEEDBACK_STATS.PHP
  * Statistieken overzicht met Apache Echarts.
- * Focus: Gemiddelde OTD & FTR scores voor '8 ritten' gesprekken.
+ * Focus: Gemiddelde OTD & FTR scores voor 8, 40 en 80 ritten.
  */
 
 require_once __DIR__ . '/config/config.php';
@@ -18,56 +18,81 @@ if (!isset($_SESSION['user_id'])) {
 $page_title = 'Statistieken';
 
 // 2. DATA OPHALEN
-// We halen de scores op voor gesprekken met review_moment = '8 ritten'
-// We filteren lege scores eruit.
-$avgOTD = 0;
-$avgFTR = 0;
-$count = 0;
+// We initialiseren de array voor de 3 meetmomenten
+$stats = [
+    '8 ritten'  => ['count' => 0, 'otd' => 0, 'ftr' => 0],
+    '40 ritten' => ['count' => 0, 'otd' => 0, 'ftr' => 0],
+    '80 ritten' => ['count' => 0, 'otd' => 0, 'ftr' => 0],
+];
 
 try {
-    // SQL om percentages schoon te maken en gemiddelde te berekenen
-    // We gebruiken REPLACE om het '%' teken weg te halen en casten naar DECIMAL
+    // We halen alles in één keer op met een GROUP BY
     $sql = "SELECT 
+                review_moment,
                 COUNT(*) as total_rows,
                 AVG(CAST(REPLACE(otd_score, '%', '') AS DECIMAL(10,2))) as avg_otd,
                 AVG(CAST(REPLACE(ftr_score, '%', '') AS DECIMAL(10,2))) as avg_ftr
             FROM feedback_forms 
-            WHERE review_moment = '8 ritten' 
+            WHERE review_moment IN ('8 ritten', '40 ritten', '80 ritten') 
             AND otd_score != '' 
-            AND ftr_score != ''";
+            AND ftr_score != ''
+            GROUP BY review_moment";
             
     $stmt = $pdo->query($sql);
-    $result = $stmt->fetch(PDO::FETCH_ASSOC);
+    $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    if ($result) {
-        $count = $result['total_rows'];
-        // Afronden op 1 decimaal
-        $avgOTD = round((float)$result['avg_otd'], 1);
-        $avgFTR = round((float)$result['avg_ftr'], 1);
+    // Resultaten mappen naar onze stats array
+    foreach ($results as $row) {
+        $moment = strtolower($row['review_moment']); // Zekerheidje voor matching
+        
+        // Match op de sleutels in $stats (die zijn lowercase '8 ritten' etc in keys hierboven als we willen, 
+        // maar in DB staat waarschijnlijk '8 ritten'. We matchen exact of via switch)
+        
+        // Kleine normalize slag voor de zekerheid
+        if (strpos($row['review_moment'], '8 ') === 0) $key = '8 ritten';
+        elseif (strpos($row['review_moment'], '40') === 0) $key = '40 ritten';
+        elseif (strpos($row['review_moment'], '80') === 0) $key = '80 ritten';
+        else $key = null;
+
+        if ($key) {
+            $stats[$key]['count'] = $row['total_rows'];
+            $stats[$key]['otd']   = round((float)$row['avg_otd'], 1);
+            $stats[$key]['ftr']   = round((float)$row['avg_ftr'], 1);
+        }
     }
 
 } catch (PDOException $e) {
-    // Foutopsporing (in productie loggen, nu stilhouden of tonen)
-    $error = $e->getMessage();
+    // Foutopsporing
 }
 
+// Data voorbereiden voor JavaScript
+$chartDataOTD = [
+    $stats['8 ritten']['otd'], 
+    $stats['40 ritten']['otd'], 
+    $stats['80 ritten']['otd']
+];
+$chartDataFTR = [
+    $stats['8 ritten']['ftr'], 
+    $stats['40 ritten']['ftr'], 
+    $stats['80 ritten']['ftr']
+];
 ?>
 <!DOCTYPE html>
 <html lang="nl">
 <head>
     <meta charset="UTF-8">
-    <title><?php echo $page_title; ?> - <?php echo defined('APP_TITLE') ? APP_TITLE : 'App'; ?></title>
+    <title><?php echo $page_title; ?></title>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
     
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
-        /* --- THEME STYLING (Consistent met Dashboard) --- */
+        /* --- THEME STYLING --- */
         :root { --brand-color: #0176d3; --bg-body: #f3f2f2; --text-main: #181818; --text-secondary: #706e6b; --border-color: #dddbda; }
         body { margin: 0; font-family: 'Segoe UI', sans-serif; background: var(--bg-body); color: var(--text-main); display: flex; height: 100vh; overflow: hidden; }
         * { box-sizing: border-box; }
 
-        /* Sidebar */
+        /* Sidebar & Layout */
         .sidebar { width: 240px; background: #1a2233; color: white; display: flex; flex-direction: column; flex-shrink: 0; }
         .sidebar-header { height: 60px; padding: 0 20px; display: flex; align-items: center; background: rgba(0,0,0,0.2); border-bottom: 1px solid rgba(255,255,255,0.1); }
         .sidebar-logo { max-height: 40px; }
@@ -76,19 +101,21 @@ try {
         .nav-item a:hover, .nav-item a.active { background: rgba(255,255,255,0.1); color: white; border-left: 4px solid var(--brand-color); }
         .nav-item .material-icons-outlined { margin-right: 12px; }
 
-        /* Content */
         .main-content { flex-grow: 1; display: flex; flex-direction: column; overflow-y: auto; }
         .top-header { height: 60px; background: white; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; padding: 0 24px; position: sticky; top: 0; z-index: 10; flex-shrink: 0; }
         .page-body { padding: 24px; max-width: 1400px; margin: 0 auto; width: 100%; }
 
         /* Cards */
         .card { background: white; border: 1px solid var(--border-color); border-radius: 4px; box-shadow: 0 2px 2px rgba(0,0,0,0.1); margin-bottom: 24px; padding: 20px; }
-        .chart-container { width: 100%; height: 400px; }
+        .chart-container { width: 100%; height: 450px; }
         
-        .stat-summary { display: flex; gap: 40px; margin-bottom: 30px; }
-        .stat-box { flex: 1; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 20px; text-align: center; }
-        .stat-value { font-size: 32px; font-weight: 300; color: var(--brand-color); }
-        .stat-label { font-size: 13px; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; margin-top: 5px; }
+        /* Stats Grid */
+        .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .stat-box { background: white; border: 1px solid var(--border-color); border-radius: 4px; padding: 20px; text-align: center; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        .stat-value { font-size: 28px; font-weight: 300; color: var(--brand-color); }
+        .stat-label { font-size: 12px; color: var(--text-secondary); text-transform: uppercase; font-weight: 700; margin-top: 5px; letter-spacing: 0.5px; }
+
+        h1, h3 { color: var(--text-main); font-weight: 600; }
     </style>
 </head>
 <body>
@@ -99,29 +126,29 @@ try {
         <?php include __DIR__ . '/includes/header.php'; ?>
 
         <div class="page-body">
-            <h1 style="margin-top: 0; font-size: 24px;">Prestatie Statistieken</h1>
+            <h1 style="margin-top: 0; font-size: 24px;">Prestatie statistieken</h1>
             <p style="color: var(--text-secondary); margin-bottom: 24px;">
-                Analyse van de <strong>8 ritten</strong> gesprekken.
+                Analyse van de gemiddelde scores per meetmoment.
             </p>
 
-            <div class="stat-summary">
+            <div class="stat-grid">
                 <div class="stat-box">
-                    <div class="stat-value"><?php echo $count; ?></div>
-                    <div class="stat-label">Aantal Gesprekken</div>
+                    <div class="stat-value"><?php echo $stats['8 ritten']['count']; ?></div>
+                    <div class="stat-label">Gesprekken 8 ritten</div>
                 </div>
                 <div class="stat-box">
-                    <div class="stat-value"><?php echo $avgOTD; ?>%</div>
-                    <div class="stat-label">Gemiddelde OTD</div>
+                    <div class="stat-value"><?php echo $stats['40 ritten']['count']; ?></div>
+                    <div class="stat-label">Gesprekken 40 ritten</div>
                 </div>
                 <div class="stat-box">
-                    <div class="stat-value"><?php echo $avgFTR; ?>%</div>
-                    <div class="stat-label">Gemiddelde FTR</div>
+                    <div class="stat-value"><?php echo $stats['80 ritten']['count']; ?></div>
+                    <div class="stat-label">Gesprekken 80 ritten</div>
                 </div>
             </div>
 
             <div class="card">
-                <h3 style="margin-top: 0; color: #333;">Gemiddelde Scores (8 Ritten)</h3>
-                <div id="main-chart" class="chart-container"></div>
+                <h3 style="margin-top: 0; margin-bottom: 20px;">Gemiddelde scores per type</h3>
+                <div id="comparison-chart" class="chart-container"></div>
             </div>
             
         </div>
@@ -129,64 +156,55 @@ try {
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            var chartDom = document.getElementById('main-chart');
+            var chartDom = document.getElementById('comparison-chart');
             var myChart = echarts.init(chartDom);
             var option;
-
-            // Data vanuit PHP
-            const avgOTD = <?php echo $avgOTD; ?>;
-            const avgFTR = <?php echo $avgFTR; ?>;
 
             option = {
                 tooltip: {
                     trigger: 'axis',
-                    axisPointer: { type: 'shadow' },
-                    formatter: '{b}: {c}%'
+                    axisPointer: { type: 'shadow' }
+                },
+                legend: {
+                    data: ['OTD score', 'FTR score'],
+                    bottom: 0
                 },
                 grid: {
                     left: '3%',
                     right: '4%',
-                    bottom: '3%',
+                    bottom: '10%',
                     containLabel: true
                 },
                 xAxis: {
                     type: 'category',
-                    data: ['OTD Score', 'FTR Score'],
+                    data: ['8 ritten', '40 ritten', '80 ritten'],
                     axisTick: { alignWithLabel: true }
                 },
                 yAxis: {
                     type: 'value',
-                    max: 100, // Percentage is max 100
+                    max: 100,
                     axisLabel: { formatter: '{value}%' }
                 },
                 series: [
                     {
-                        name: 'Gemiddelde',
+                        name: 'OTD score',
                         type: 'bar',
-                        barWidth: '40%',
-                        data: [
-                            {
-                                value: avgOTD,
-                                itemStyle: { color: '#0176d3' } // Blauw voor OTD
-                            },
-                            {
-                                value: avgFTR,
-                                itemStyle: { color: '#10b981' } // Groen voor FTR
-                            }
-                        ],
-                        label: {
-                            show: true,
-                            position: 'top',
-                            formatter: '{c}%',
-                            fontWeight: 'bold'
-                        }
+                        data: <?php echo json_encode($chartDataOTD); ?>,
+                        itemStyle: { color: '#0176d3' },
+                        label: { show: true, position: 'top', formatter: '{c}%' }
+                    },
+                    {
+                        name: 'FTR score',
+                        type: 'bar',
+                        data: <?php echo json_encode($chartDataFTR); ?>,
+                        itemStyle: { color: '#10b981' },
+                        label: { show: true, position: 'top', formatter: '{c}%' }
                     }
                 ]
             };
 
             option && myChart.setOption(option);
             
-            // Responsief maken
             window.addEventListener('resize', function() {
                 myChart.resize();
             });
