@@ -15,7 +15,7 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 // 2. CONFIGURATIE VOOR HEADER & PAGINERING
-$page_title = 'Alle Gesprekken'; // Zorgt dat de header de titel toont
+$page_title = 'Alle Gesprekken'; 
 $limit = 15; 
 $page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int)$_GET['page'] : 1;
 if ($page < 1) $page = 1;
@@ -25,13 +25,11 @@ $offset = ($page - 1) * $limit;
 $filter_status = $_GET['status'] ?? '';
 $filter_assigned = $_GET['assigned_to'] ?? '';
 
-// 3. DATA OPHALEN: TEAMLEADS (Voor filter dropdown)
+// 3. DATA OPHALEN: TEAMLEADS
 try {
     $stmtUsers = $pdo->query("SELECT id, email, first_name, last_name FROM users ORDER BY first_name ASC");
     $users = $stmtUsers->fetchAll(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {
-    $users = [];
-}
+} catch (PDOException $e) { $users = []; }
 
 // 4. QUERY OPBOUWEN
 $whereSQL = "WHERE 1=1";
@@ -82,10 +80,8 @@ try {
     die("Database fout: " . $e->getMessage());
 }
 
-// Helper voor paginering links (behoudt filters)
 function get_page_link($pageNum) {
-    $params = $_GET;
-    $params['page'] = $pageNum;
+    $params = $_GET; $params['page'] = $pageNum;
     return '?' . http_build_query($params);
 }
 ?>
@@ -93,23 +89,30 @@ function get_page_link($pageNum) {
 <html lang="nl">
 <head>
     <meta charset="UTF-8">
-    <title><?php echo $page_title; ?> - <?php echo defined('APP_TITLE') ? APP_TITLE : 'App'; ?></title>
+    <title><?php echo $page_title; ?></title>
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
-        /* --- COPY STYLING VAN DASHBOARD --- */
+        /* --- THEME --- */
         :root { --brand-color: #0176d3; --bg-body: #f3f2f2; --text-main: #181818; --text-secondary: #706e6b; --border-color: #dddbda; }
         body { margin: 0; font-family: 'Segoe UI', sans-serif; background: var(--bg-body); color: var(--text-main); display: flex; height: 100vh; overflow: hidden; }
         * { box-sizing: border-box; }
 
-        /* Layout */
+        /* --- SIDEBAR STYLING (NU COMPLEET) --- */
         .sidebar { width: 240px; background: #1a2233; color: white; display: flex; flex-direction: column; flex-shrink: 0; }
+        .sidebar-header { height: 60px; padding: 0 20px; display: flex; align-items: center; background: rgba(0,0,0,0.2); border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .sidebar-logo { max-height: 40px; }
+        .nav-list { list-style: none; padding: 20px 0; margin: 0; }
+        .nav-item a { display: flex; align-items: center; padding: 12px 20px; color: #b0b6c3; text-decoration: none; transition: 0.2s; font-size: 14px; }
+        .nav-item a:hover, .nav-item a.active { background: rgba(255,255,255,0.1); color: white; border-left: 4px solid var(--brand-color); }
+        .nav-item .material-icons-outlined { margin-right: 12px; }
+
+        /* --- CONTENT STYLING --- */
         .main-content { flex-grow: 1; display: flex; flex-direction: column; overflow-y: auto; }
         .top-header { height: 60px; background: white; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; padding: 0 24px; position: sticky; top: 0; z-index: 10; flex-shrink: 0; }
         .page-body { padding: 24px; max-width: 1400px; margin: 0 auto; width: 100%; }
-
         .card { background: white; border: 1px solid var(--border-color); border-radius: 4px; box-shadow: 0 2px 2px rgba(0,0,0,0.1); margin-bottom: 24px; }
-        
+
         /* Filter Bar */
         .filter-bar { padding: 16px; border-bottom: 1px solid var(--border-color); display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap; background: #fcfcfc; }
         .filter-group { display: flex; flex-direction: column; gap: 4px; }
@@ -145,11 +148,17 @@ function get_page_link($pageNum) {
     <?php include __DIR__ . '/includes/sidebar.php'; ?>
 
     <main class="main-content">
-        
         <?php include __DIR__ . '/includes/header.php'; ?>
 
         <div class="page-body">
             
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h1 style="margin: 0; font-size: 24px;">Alle Gesprekken</h1>
+                <a href="feedback_create.php" style="background: var(--brand-color); color: white; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-weight: 600; display: flex; align-items: center; gap: 6px; font-size: 14px;">
+                    <span class="material-icons-outlined">add</span> Nieuw gesprek
+                </a>
+            </div>
+
             <div class="card">
                 <form method="GET" class="filter-bar">
                     <div class="filter-group">
@@ -160,7 +169,6 @@ function get_page_link($pageNum) {
                             <option value="completed" <?php if($filter_status == 'completed') echo 'selected'; ?>>Completed</option>
                         </select>
                     </div>
-
                     <div class="filter-group">
                         <label>Toegewezen aan</label>
                         <select name="assigned_to" class="filter-select">
@@ -174,7 +182,6 @@ function get_page_link($pageNum) {
                             <?php endforeach; ?>
                         </select>
                     </div>
-
                     <div style="margin-left: auto; display: flex; gap: 10px;">
                         <a href="feedback_overview.php" class="btn-reset">Reset</a>
                         <button type="submit" class="btn-filter">Filteren</button>
@@ -197,46 +204,26 @@ function get_page_link($pageNum) {
                         <tbody>
                             <?php if (empty($feedbacks)): ?>
                                 <tr>
-                                    <td colspan="7" style="text-align: center; padding: 30px; color: #999;">
-                                        Geen gesprekken gevonden met deze filters.
-                                    </td>
+                                    <td colspan="7" style="text-align: center; padding: 30px; color: #999;">Geen gesprekken gevonden.</td>
                                 </tr>
                             <?php else: ?>
                                 <?php foreach ($feedbacks as $row): ?>
                                 <tr>
-                                    <td>
-                                        <?php echo date('d-m-Y', strtotime($row['form_date'])); ?>
-                                    </td>
+                                    <td><?php echo date('d-m-Y', strtotime($row['form_date'])); ?></td>
                                     <td>
                                         <a href="driver_history.php?driver_id=<?php echo $row['driver_id']; ?>" style="font-weight: 700; color: var(--brand-color); text-decoration: none;">
                                             <?php echo htmlspecialchars($row['driver_name']); ?>
                                         </a>
-                                        <div style="font-size: 11px; color: #999;">
-                                            <?php echo htmlspecialchars($row['employee_id']); ?>
-                                        </div>
+                                        <div style="font-size: 11px; color: #999;"><?php echo htmlspecialchars($row['employee_id']); ?></div>
                                     </td>
+                                    <td><?php echo htmlspecialchars($row['review_moment'] ?: 'Standaard'); ?></td>
+                                    <td><?php echo format_status_badge($row['status']); ?></td>
                                     <td>
-                                        <?php echo htmlspecialchars($row['review_moment'] ?: 'Standaard'); ?>
+                                        <?php echo $row['assign_email'] ? format_user_name($row['assign_first'], $row['assign_last'], $row['assign_email']) : '<span style="color:#ccc;">--</span>'; ?>
                                     </td>
-                                    <td>
-                                        <?php echo format_status_badge($row['status']); ?>
-                                    </td>
-                                    <td>
-                                        <?php 
-                                            if ($row['assign_email']) {
-                                                echo format_user_name($row['assign_first'], $row['assign_last'], $row['assign_email']);
-                                            } else {
-                                                echo '<span style="color:#ccc;">--</span>';
-                                            }
-                                        ?>
-                                    </td>
-                                    <td style="font-size: 12px; color: #666;">
-                                        <?php echo htmlspecialchars($row['creator_email']); ?>
-                                    </td>
+                                    <td style="font-size: 12px; color: #666;"><?php echo htmlspecialchars($row['creator_email']); ?></td>
                                     <td style="text-align: right;">
-                                        <a href="feedback_view.php?id=<?php echo $row['id']; ?>" class="btn-icon" title="Bekijken">
-                                            <span class="material-icons-outlined">visibility</span>
-                                        </a>
+                                        <a href="feedback_view.php?id=<?php echo $row['id']; ?>" class="btn-icon"><span class="material-icons-outlined">visibility</span></a>
                                     </td>
                                 </tr>
                                 <?php endforeach; ?>
@@ -254,11 +241,7 @@ function get_page_link($pageNum) {
                             <span class="page-link disabled">&laquo; Vorige</span>
                         <?php endif; ?>
                     </div>
-
-                    <div class="page-info">
-                        Pagina <strong><?php echo $page; ?></strong> van <strong><?php echo $totalPages; ?></strong>
-                    </div>
-
+                    <div class="page-info">Pagina <strong><?php echo $page; ?></strong> van <strong><?php echo $totalPages; ?></strong></div>
                     <div>
                         <?php if ($page < $totalPages): ?>
                             <a href="<?php echo get_page_link($page + 1); ?>" class="page-link">Volgende &raquo;</a>
@@ -269,7 +252,6 @@ function get_page_link($pageNum) {
                 </div>
                 <?php endif; ?>
             </div>
-
         </div>
     </main>
 </body>
