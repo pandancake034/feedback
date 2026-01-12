@@ -313,19 +313,19 @@ function getInitials($name) {
                             <hr style="border:0; border-top:1px solid #eee; margin:15px 0;">
 
                             <div style="margin-bottom: 24px;">
-                                <div class="label">Besproken punten & vragen</div>
-                                <div class="value" style="background:#f9f9f9; padding:15px; border-radius:4px; border:1px solid #eee; text-align: left;">
-                                    <?php echo nl2br(htmlspecialchars($form['general_comments'] ?: 'Geen notities.')); ?>
-                                </div>
-                            </div>
+    <div class="label">Besproken punten & vragen</div>
+    <div class="value" style="background:#f9f9f9; padding:15px; border-radius:4px; border:1px solid #eee; text-align: left;">
+        <?php echo nl2br(htmlspecialchars($form['general_comments'] ?: 'Geen notities.')); ?>
+    </div>
+</div>
 
-                            <div style="margin-bottom: 24px;">
-                                <div class="label">Gemaakte afspraken</div>
-                                <div class="value" style="background:#f0fdf4; color:#166534; padding:15px; border-radius:4px; border:1px solid #bbf7d0; text-align: left;">
-                                    <span class="material-icons-outlined" style="font-size:16px; vertical-align:middle; margin-right:5px;">handshake</span>
-                                    <?php echo nl2br(htmlspecialchars($form['agreements'] ?: 'Geen afspraken vastgelegd.')); ?>
-                                </div>
-                            </div>
+<div style="margin-bottom: 24px;">
+    <div class="label">Gemaakte afspraken</div>
+    <div class="value" style="background:#f0fdf4; color:#166534; padding:15px; border-radius:4px; border:1px solid #bbf7d0; text-align: left;">
+        <span class="material-icons-outlined" style="font-size:16px; vertical-align:middle; margin-right:5px;">handshake</span>
+        <?php echo nl2br(htmlspecialchars($form['agreements'] ?: 'Geen afspraken vastgelegd.')); ?>
+    </div>
+</div>
 
                             <?php if(!empty($form['misc_comments'])): ?>
                             <div>
