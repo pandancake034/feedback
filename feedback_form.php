@@ -275,7 +275,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             <form method="POST">
                 
                 <div class="card">
-                    <h3 class="form-section-title">1. Chauffeur & Planning</h3>
+                    <h3 class="form-section-title">1. Chauffeur & planning</h3>
                     <div class="card-body">
                         
                         <?php if ($is_new): ?>
