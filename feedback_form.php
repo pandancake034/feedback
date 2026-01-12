@@ -417,7 +417,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                     <option value="Laden+rit">Laden+rit</option>
                                     <option value="Laden/Reserve">Laden/Reserve</option>
                                     <option value="Parkeerwachter">Parkeerwachter</option>
-                                    <option value="Inchecken & Laadcoördinator">Inchecken & Laadcoördinator</option>
+                                    <option value="Inchecken">Inchecken</option>
+                                              <option value="Laadcoördinator">Laadcoördinator</option>
                                 </select>
                                 
                                 <div id="skillsContainer" class="skills-container"></div>
