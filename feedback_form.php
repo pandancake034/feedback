@@ -345,15 +345,20 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                 <input type="date" name="start_date" value="<?php echo htmlspecialchars($data['start_date']); ?>" required>
                             </div>
 
-                            <div class="form-group">
-                                <label>Beoordelingsmoment:</label>
-                                <select name="review_moment">
-                                    <option value="">-- Kies --</option>
-                                    <option value="8 ritten" <?php if($data['review_moment'] == '8 weken' || $data['review_moment'] == '8 ritten') echo 'selected'; ?>>8 ritten</option>
-                                    <option value="26 weken" <?php if($data['review_moment'] == '26 weken') echo 'selected'; ?>>26 weken</option>
-                                    <option value="52 weken" <?php if($data['review_moment'] == '52 weken') echo 'selected'; ?>>52 weken</option>
-                                </select>
-                            </div>
+                           <div class="form-group">
+    <label>Beoordelingsmoment:</label>
+    <select name="review_moment">
+        <option value="">-- Kies --</option>
+        
+        <option value="8 ritten" <?php if($data['review_moment'] == '8 ritten' || $data['review_moment'] == '8 weken') echo 'selected'; ?>>8 ritten</option>
+        
+        <option value="40 ritten" <?php if($data['review_moment'] == '40 ritten') echo 'selected'; ?>>40 ritten</option>
+        
+        <option value="80 ritten" <?php if($data['review_moment'] == '80 ritten') echo 'selected'; ?>>80 ritten</option>
+        
+        <option value="Algemene beoordeling" <?php if($data['review_moment'] == 'Algemene beoordeling') echo 'selected'; ?>>Algemene beoordeling</option>
+    </select>
+</div>
 
                         </div>
                     </div>
