@@ -417,7 +417,7 @@ function getInitials($name) {
             <div class="col-right">
                 <div class="card">
                     <div class="card-header">
-                        <span><span class="material-icons-outlined" style="vertical-align:middle; margin-right:8px;">forum</span>Notities & Chat</span>
+                        <span><span class="material-icons-outlined" style="vertical-align:middle; margin-right:8px;">forum</span>Notities</span>
                     </div>
                     <div class="card-body" style="background-color: #fcfcfc; max-height: 600px; overflow-y: auto;">
                         
