@@ -359,7 +359,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     </div>
 
                     <div class="card">
-                        <h3 class="form-section-title"><span class="material-icons-outlined">psychology</span> 3. Gedrag & beoordeling</h3>
+                        <h3 class="form-section-title"><span class="material-icons-outlined">psychology</span> 3. Gedrag & b..eoordeling</h3>
                         <div class="card-body">
                             <div class="form-group"><label>Rijgedrag & communicatie</label><textarea name="driving_behavior"><?php echo htmlspecialchars($data['driving_behavior']); ?></textarea></div>
                             <div class="form-group"><label>Waarschuwingen</label><textarea name="warnings" style="border-color: #fca5a5;"><?php echo htmlspecialchars($data['warnings']); ?></textarea></div>
