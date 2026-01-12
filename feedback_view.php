@@ -1,12 +1,12 @@
 <?php
 /**
  * FEEDBACK_VIEW.PHP
- * High-end versie: Visualisaties, Steppers, CSRF, Avatar.
- * Update: Skills als tekst labels (tags).
+ * Update: Ondersteuning voor 'Algemene Beoordeling' weergave.
  */
 
 require_once __DIR__ . '/config/config.php';
 require_once __DIR__ . '/config/db.php';
+require_once __DIR__ . '/includes/helpers.php';
 
 // Check login
 if (!isset($_SESSION['user_id'])) { header("Location: login.php"); exit; }
@@ -23,7 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // A. NIEUWE NOTITIE
     if (isset($_POST['action']) && $_POST['action'] === 'add_note' && !empty($_POST['note_content'])) {
         try {
-            $stmt = $pdo->prepare("INSERT INTO notes (driver_id, user_id, content) VALUES (?, ?, ?)");
+            $stmt = $pdo->prepare("INSERT INTO notes (driver_id, user_id, content, note_date) VALUES (?, ?, ?, NOW())");
             $stmt->execute([$_POST['driver_id'], $_SESSION['user_id'], $_POST['note_content']]);
             header("Location: feedback_view.php?id=" . $form_id . "&msg=saved"); exit;
         } catch (PDOException $e) { $error = "Kon notitie niet opslaan."; }
@@ -32,11 +32,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // B. NOTITIE BEWERKEN
     if (isset($_POST['action']) && $_POST['action'] === 'edit_note') {
         try {
+            // Check eigenaar
             $check = $pdo->prepare("SELECT user_id FROM notes WHERE id = ?");
             $check->execute([$_POST['note_id']]);
             $noteOwner = $check->fetchColumn();
 
-            if ($noteOwner == $_SESSION['user_id'] || $_SESSION['role'] === 'admin') {
+            if ($noteOwner == $_SESSION['user_id'] || (isset($_SESSION['role']) && $_SESSION['role'] === 'admin')) {
                 $stmt = $pdo->prepare("UPDATE notes SET content = ?, updated_at = NOW() WHERE id = ?");
                 $stmt->execute([$_POST['note_content'], $_POST['note_id']]);
                 header("Location: feedback_view.php?id=" . $form_id . "&msg=updated"); exit;
@@ -51,7 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $check->execute([$_POST['note_id']]);
             $noteOwner = $check->fetchColumn();
 
-            if ($noteOwner == $_SESSION['user_id'] || $_SESSION['role'] === 'admin') {
+            if ($noteOwner == $_SESSION['user_id'] || (isset($_SESSION['role']) && $_SESSION['role'] === 'admin')) {
                 $stmt = $pdo->prepare("DELETE FROM notes WHERE id = ?");
                 $stmt->execute([$_POST['note_id']]);
                 header("Location: feedback_view.php?id=" . $form_id . "&msg=deleted"); exit;
@@ -62,30 +63,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // --- 2. DATA OPHALEN ---
 try {
+    // Haal formulier op
     $stmt = $pdo->prepare("SELECT f.*, d.name as driver_name, d.employee_id, u.email as creator_email 
                            FROM feedback_forms f 
                            JOIN drivers d ON f.driver_id = d.id 
-                           JOIN users u ON f.created_by_user_id = u.id
+                           LEFT JOIN users u ON f.created_by_user_id = u.id
                            WHERE f.id = ?");
     $stmt->execute([$form_id]);
     $form = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$form) die("Dossier niet gevonden.");
 
-    // Notities ophalen
+    // Check type gesprek
+    $isGeneral = ($form['review_moment'] === 'Algemene beoordeling');
+
+    // Haal notities op
     $stmtNotes = $pdo->prepare("SELECT n.*, u.id as user_id, u.email, u.first_name, u.last_name 
                                 FROM notes n 
-                                JOIN users u ON n.user_id = u.id 
+                                LEFT JOIN users u ON n.user_id = u.id 
                                 WHERE n.driver_id = ? 
                                 ORDER BY n.note_date DESC"); 
     $stmtNotes->execute([$form['driver_id']]);
     $notes = $stmtNotes->fetchAll(PDO::FETCH_ASSOC);
 
+    // Als er een gekoppeld vorig gesprek is, haal datum op voor de link
+    $linkedFormDate = '';
+    if (!empty($form['linked_form_id'])) {
+        $stmtL = $pdo->prepare("SELECT form_date, review_moment FROM feedback_forms WHERE id = ?");
+        $stmtL->execute([$form['linked_form_id']]);
+        $lf = $stmtL->fetch();
+        if($lf) $linkedFormDate = date('d-m-Y', strtotime($lf['form_date'])) . ' (' . $lf['review_moment'] . ')';
+    }
+
 } catch (PDOException $e) {
     die("Database fout: " . $e->getMessage());
 }
-
-$page_title = "Dossier " . htmlspecialchars($form['driver_name']) . " (" . htmlspecialchars($form['employee_id']) . ")";
 
 function getInitials($name) {
     $parts = explode(' ', $name);
@@ -113,8 +125,8 @@ function getInitials($name) {
         .top-header { height: 60px; background: white; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; padding: 0 24px; flex-shrink: 0; }
         .content-body { padding: 24px; display: flex; gap: 24px; flex-grow: 1; max-width: 1600px; margin: 0 auto; width: 100%; }
         
-        .col-left { flex: 2; display: flex; flex-direction: column; gap: 24px; }
-        .col-right { flex: 1; min-width: 400px; }
+        .col-left { flex: 2; display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+        .col-right { flex: 1; min-width: 350px; }
 
         .card { background: white; border: 1px solid var(--border-color); border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); overflow: hidden; }
         .card-header { padding: 16px 20px; background: #fff; border-bottom: 1px solid #f0f0f0; font-weight: 700; font-size: 15px; display: flex; justify-content: space-between; align-items: center; color: var(--brand-color); }
@@ -128,15 +140,16 @@ function getInitials($name) {
             color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; 
             font-size: 24px; font-weight: 700; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border: 3px solid white;
         }
-        
         .profile-link { color: var(--text-main); text-decoration: none; transition: color 0.2s; }
         .profile-link:hover { color: var(--brand-color); text-decoration: underline; }
 
-        /* DETAILS & PROGRESS */
+        /* DETAILS */
         .detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
         .detail-item { margin-bottom: 8px; }
         .label { font-size: 12px; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; margin-bottom: 4px; }
-        .value { font-size: 15px; color: var(--text-main); font-weight: 500; line-height: 1.5; }
+        .value { font-size: 15px; color: var(--text-main); font-weight: 500; line-height: 1.5; white-space: pre-wrap; }
+        
+        /* KPI Visuals */
         .progress-wrapper { margin-top: 5px; }
         .progress-bg { height: 6px; background: #eee; border-radius: 3px; overflow: hidden; width: 100%; }
         .progress-fill { height: 100%; background: var(--brand-color); border-radius: 3px; transition: width 0.5s ease; }
@@ -153,7 +166,7 @@ function getInitials($name) {
         .step.completed .step-icon { background: #10b981; color: white; }
         .step.completed::after { background: #10b981; }
 
-        /* --- CHAT STYLES --- */
+        /* CHAT STYLES */
         .chat-container { display: flex; flex-direction: column; gap: 15px; padding-bottom: 20px; }
         .chat-row { display: flex; align-items: flex-end; gap: 10px; width: 100%; }
         .chat-row.me { justify-content: flex-end; }
@@ -171,12 +184,9 @@ function getInitials($name) {
         .chat-bubble:hover .chat-actions { opacity: 1; }
         .chat-action-icon { cursor: pointer; font-size: 14px; }
         .chat-row.me .chat-action-icon { color: rgba(255,255,255, 0.9); }
-        .chat-row.me .chat-action-icon:hover { color: white; font-weight: bold; }
         .chat-row.other .chat-action-icon { color: #999; }
-        .chat-row.other .chat-action-icon:hover { color: var(--brand-color); }
-        .chat-row.other .chat-action-icon.delete:hover { color: #c53030; }
 
-        /* Forms & Buttons */
+        /* Buttons & Forms */
         .note-input { width: 100%; border: 1px solid var(--border-color); border-radius: 4px; padding: 12px; font-family: inherit; font-size: 13px; resize: vertical; min-height: 80px; transition: 0.2s; }
         .note-input:focus { border-color: var(--brand-color); outline: none; box-shadow: 0 0 0 2px rgba(1, 118, 211, 0.1); }
         .btn-add { background: var(--brand-color); color: white; border: none; padding: 8px 16px; border-radius: 4px; font-size: 13px; font-weight: 600; cursor: pointer; margin-top: 10px; float: right; }
@@ -185,27 +195,23 @@ function getInitials($name) {
         .btn-action:hover { background: #f3f2f2; border-color: #ccc; }
         .btn-primary { background: var(--brand-color); color: white; border: none; }
         .btn-primary:hover { background: #014486; }
-
-        /* Modal Styles */
+        
+        /* Modal */
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; display: none; align-items: center; justify-content: center; backdrop-filter: blur(2px); }
         .modal { background: white; width: 100%; max-width: 500px; border-radius: 6px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
         .modal-header { padding: 16px 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; font-weight: 700; background: #f8f9fa; }
         .modal-body { padding: 20px; }
         .modal-footer { padding: 16px 20px; background: #f8f9fa; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 10px; }
 
-        /* Print */
+        /* Print Style */
         .print-only-logo { display: none; }
         @media print {
             .sidebar, .top-header, .btn-action, .btn-add, .note-input, .no-print, .chat-actions { display: none !important; }
             body, .main-content, .content-body { display: block !important; height: auto !important; background: white !important; padding: 0 !important; margin: 0 !important; }
             .col-left, .col-right { width: 100% !important; flex: none !important; margin-bottom: 20px; }
             .card { box-shadow: none !important; border: 1px solid #ccc !important; break-inside: avoid; }
-            .stepper { display: none; }
             .print-only-logo { display: block !important; max-width: 150px; margin-bottom: 20px; }
             .profile-avatar { display: none; } 
-            .chat-container { display: block; }
-            .chat-row { display: block; margin-bottom: 10px; }
-            .chat-bubble { max-width: 100%; background: white !important; color: black !important; border: 1px solid #ccc !important; }
         }
     </style>
 </head>
@@ -243,6 +249,9 @@ function getInitials($name) {
                             <span style="font-size: 13px; color: var(--text-light); display: block; margin-top: 4px;">
                                 ID: <?php echo htmlspecialchars($form['employee_id']); ?> • 
                                 Gesprek: <?php echo date('d-m-Y', strtotime($form['form_date'])); ?>
+                                <?php if($isGeneral): ?>
+                                    <span style="background:#e0e7ff; color:#014486; padding:1px 6px; border-radius:4px; font-size:11px; margin-left:6px; font-weight:700;">ALGEMEEN</span>
+                                <?php endif; ?>
                             </span>
                         </div>
                     </div>
@@ -269,7 +278,7 @@ function getInitials($name) {
                     </div>
                     <div class="step <?php echo $openClass; ?>">
                         <div class="step-icon"><span class="material-icons-outlined" style="font-size:16px;">rate_review</span></div>
-                        Beoordeling
+                        Bespreking
                     </div>
                     <div class="step <?php echo $doneClass; ?>">
                         <div class="step-icon"><span class="material-icons-outlined" style="font-size:16px;">check_circle</span></div>
@@ -277,88 +286,138 @@ function getInitials($name) {
                     </div>
                 </div>
 
-                <div class="card">
-                    <div class="card-header">
-                        <span><span class="material-icons-outlined" style="vertical-align:middle; margin-right:8px;">insights</span>Prestaties</span>
-                    </div>
-                    <div class="card-body">
-                        <div class="detail-grid">
-                            <div class="detail-item">
-                                <div class="label">OTD Score</div>
-                                <?php $otdVal = floatval(str_replace('%', '', $form['otd_score'])); $otdColor = ($otdVal >= 96) ? 'success' : 'warning'; ?>
-                                <div class="progress-wrapper">
-                                    <div class="progress-text"><?php echo htmlspecialchars($form['otd_score']); ?></div>
-                                    <div class="progress-bg"><div class="progress-fill <?php echo $otdColor; ?>" style="width: <?php echo $otdVal; ?>%;"></div></div>
-                                </div>
-                            </div>
-                            <div class="detail-item">
-                                <div class="label">FTR Score</div>
-                                <?php $ftrVal = floatval(str_replace('%', '', $form['ftr_score'])); $ftrColor = ($ftrVal >= 96) ? 'success' : 'warning'; ?>
-                                <div class="progress-wrapper">
-                                    <div class="progress-text"><?php echo htmlspecialchars($form['ftr_score']); ?></div>
-                                    <div class="progress-bg"><div class="progress-fill <?php echo $ftrColor; ?>" style="width: <?php echo $ftrVal; ?>%;"></div></div>
-                                </div>
-                            </div>
-                            <div class="detail-item"><div class="label">KW Verbruik</div><div class="value" style="font-size: 18px;"><?php echo htmlspecialchars($form['kw_score'] ?: '-'); ?></div></div>
-                            <div class="detail-item"><div class="label">Aantal Routes</div><div class="value" style="font-size: 18px;"><?php echo htmlspecialchars($form['routes_count']); ?></div></div>
+                <?php if ($isGeneral): ?>
+                    <div class="card" style="border-left: 4px solid var(--brand-color);">
+                        <div class="card-header">
+                            <span><span class="material-icons-outlined" style="vertical-align:middle; margin-right:8px;">forum</span>Gespreksverslag</span>
                         </div>
-                        <hr style="border:0; border-top:1px solid #eee; margin: 20px 0;">
-                        <div class="detail-grid">
-                            <div class="detail-item"><div class="label">Fouten (Errors)</div><div class="value"><?php echo nl2br(htmlspecialchars($form['errors_text'] ?: 'Geen')); ?></div></div>
-                            <div class="detail-item"><div class="label">Te Laat</div><div class="value"><?php echo nl2br(htmlspecialchars($form['late_text'] ?: 'Geen')); ?></div></div>
-                        </div>
-                    </div>
-                </div>
+                        <div class="card-body">
+                            <div class="detail-grid" style="margin-bottom:20px;">
+                                <div class="detail-item">
+                                    <div class="label">Reden van gesprek</div>
+                                    <div class="value" style="font-size:16px; font-weight:600;"><?php echo htmlspecialchars($form['conversation_reason'] ?: 'Geen reden opgegeven'); ?></div>
+                                </div>
+                                <?php if($linkedFormDate): ?>
+                                <div class="detail-item">
+                                    <div class="label">Referentie naar vorig gesprek</div>
+                                    <div class="value">
+                                        <a href="feedback_view.php?id=<?php echo $form['linked_form_id']; ?>" style="color:var(--brand-color); text-decoration:none; display:flex; align-items:center; gap:5px;">
+                                            <span class="material-icons-outlined" style="font-size:16px;">link</span>
+                                            <?php echo htmlspecialchars($linkedFormDate); ?>
+                                        </a>
+                                    </div>
+                                </div>
+                                <?php endif; ?>
+                            </div>
 
-                <div class="card">
-                    <div class="card-header">
-                        <span><span class="material-icons-outlined" style="vertical-align:middle; margin-right:8px;">psychology</span>Gedrag & Soft Skills</span>
-                    </div>
-                    <div class="card-body">
-                        <div style="margin-bottom: 20px;">
-                            <div class="label">Rijgedrag & Communicatie</div>
-                            <div class="value" style="background: #f9fafb; padding: 10px; border-radius: 4px; border: 1px solid #eee;">
-                                <?php echo nl2br(htmlspecialchars($form['driving_behavior'] ?: 'Geen opmerkingen.')); ?>
-                            </div>
-                        </div>
-                        <div class="detail-grid" style="margin-bottom: 20px;">
-                            
-                            <div class="detail-item">
-                                <div class="label">Skills / Rollen</div>
-                                <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:4px;">
-                                    <?php 
-                                    $skillsList = explode(',', $form['skills_rating'] ?? '');
-                                    $hasSkills = false;
-                                    foreach($skillsList as $skill):
-                                        $skill = trim($skill);
-                                        if(!empty($skill)): 
-                                            $hasSkills = true;
-                                    ?>
-                                        <span style="background:#e0e7ff; color:#014486; border:1px solid #0176d3; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600;">
-                                            <?php echo htmlspecialchars($skill); ?>
-                                        </span>
-                                    <?php 
-                                        endif; 
-                                    endforeach; 
-                                    if(!$hasSkills) echo '<span style="color:#999; font-style:italic; font-size:13px;">Geen skills geregistreerd.</span>';
-                                    ?>
+                            <hr style="border:0; border-top:1px solid #eee; margin:15px 0;">
+
+                            <div style="margin-bottom: 24px;">
+                                <div class="label">Besproken punten & Vragen</div>
+                                <div class="value" style="background:#f9f9f9; padding:15px; border-radius:4px; border:1px solid #eee;">
+                                    <?php echo nl2br(htmlspecialchars($form['general_comments'] ?: 'Geen notities.')); ?>
                                 </div>
                             </div>
 
-                            <div class="detail-item"><div class="label">Proficiency Level</div><div class="value">Niveau <strong><?php echo $form['proficiency_rating']; ?></strong> / 14</div></div>
-                        </div>
-                        <div class="detail-grid">
-                            <div class="detail-item"><div class="label">Complimenten</div><div class="value" style="color: #065f46; background: #d1fae5; padding: 10px; border-radius: 4px; border: 1px solid #6ee7b7;"><?php echo nl2br(htmlspecialchars($form['client_compliment'] ?: 'Geen complimenten geregistreerd.')); ?></div></div>
-                            <div class="detail-item"><div class="label">Waarschuwingen</div><div class="value" style="color: #c53030; background: #fff5f5; padding: 10px; border-radius: 4px; border: 1px solid #fed7d7;"><?php echo nl2br(htmlspecialchars($form['warnings'] ?: 'Geen waarschuwingen geregistreerd.')); ?></div></div>
+                            <div style="margin-bottom: 24px;">
+                                <div class="label">Gemaakte Afspraken</div>
+                                <div class="value" style="background:#f0fdf4; color:#166534; padding:15px; border-radius:4px; border:1px solid #bbf7d0;">
+                                    <span class="material-icons-outlined" style="font-size:16px; vertical-align:middle; margin-right:5px;">handshake</span>
+                                    <?php echo nl2br(htmlspecialchars($form['agreements'] ?: 'Geen afspraken vastgelegd.')); ?>
+                                </div>
+                            </div>
+
+                            <?php if(!empty($form['misc_comments'])): ?>
+                            <div>
+                                <div class="label">Overige opmerkingen</div>
+                                <div class="value"><?php echo nl2br(htmlspecialchars($form['misc_comments'])); ?></div>
+                            </div>
+                            <?php endif; ?>
                         </div>
                     </div>
-                </div>
+
+                <?php else: ?>
+                    <div class="card">
+                        <div class="card-header">
+                            <span><span class="material-icons-outlined" style="vertical-align:middle; margin-right:8px;">insights</span>Prestaties</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="detail-grid">
+                                <div class="detail-item">
+                                    <div class="label">OTD Score</div>
+                                    <?php $otdVal = floatval(str_replace('%', '', $form['otd_score'])); $otdColor = ($otdVal >= 96) ? 'success' : 'warning'; ?>
+                                    <div class="progress-wrapper">
+                                        <div class="progress-text"><?php echo htmlspecialchars($form['otd_score']); ?></div>
+                                        <div class="progress-bg"><div class="progress-fill <?php echo $otdColor; ?>" style="width: <?php echo $otdVal; ?>%;"></div></div>
+                                    </div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="label">FTR Score</div>
+                                    <?php $ftrVal = floatval(str_replace('%', '', $form['ftr_score'])); $ftrColor = ($ftrVal >= 96) ? 'success' : 'warning'; ?>
+                                    <div class="progress-wrapper">
+                                        <div class="progress-text"><?php echo htmlspecialchars($form['ftr_score']); ?></div>
+                                        <div class="progress-bg"><div class="progress-fill <?php echo $ftrColor; ?>" style="width: <?php echo $ftrVal; ?>%;"></div></div>
+                                    </div>
+                                </div>
+                                <div class="detail-item"><div class="label">KW Verbruik</div><div class="value" style="font-size: 18px;"><?php echo htmlspecialchars($form['kw_score'] ?: '-'); ?></div></div>
+                                <div class="detail-item"><div class="label">Aantal Routes</div><div class="value" style="font-size: 18px;"><?php echo htmlspecialchars($form['routes_count']); ?></div></div>
+                            </div>
+                            <hr style="border:0; border-top:1px solid #eee; margin: 20px 0;">
+                            <div class="detail-grid">
+                                <div class="detail-item"><div class="label">Fouten (Errors)</div><div class="value"><?php echo nl2br(htmlspecialchars($form['errors_text'] ?: 'Geen')); ?></div></div>
+                                <div class="detail-item"><div class="label">Te Laat</div><div class="value"><?php echo nl2br(htmlspecialchars($form['late_text'] ?: 'Geen')); ?></div></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <span><span class="material-icons-outlined" style="vertical-align:middle; margin-right:8px;">psychology</span>Gedrag & Soft Skills</span>
+                        </div>
+                        <div class="card-body">
+                            <div style="margin-bottom: 20px;">
+                                <div class="label">Rijgedrag & Communicatie</div>
+                                <div class="value" style="background: #f9fafb; padding: 10px; border-radius: 4px; border: 1px solid #eee;">
+                                    <?php echo nl2br(htmlspecialchars($form['driving_behavior'] ?: 'Geen opmerkingen.')); ?>
+                                </div>
+                            </div>
+                            <div class="detail-grid" style="margin-bottom: 20px;">
+                                <div class="detail-item">
+                                    <div class="label">Skills / Rollen</div>
+                                    <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:4px;">
+                                        <?php 
+                                        $skillsList = explode(',', $form['skills_rating'] ?? '');
+                                        $hasSkills = false;
+                                        foreach($skillsList as $skill):
+                                            $skill = trim($skill);
+                                            if(!empty($skill)): 
+                                                $hasSkills = true;
+                                        ?>
+                                            <span style="background:#e0e7ff; color:#014486; border:1px solid #0176d3; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600;">
+                                                <?php echo htmlspecialchars($skill); ?>
+                                            </span>
+                                        <?php 
+                                            endif; 
+                                        endforeach; 
+                                        if(!$hasSkills) echo '<span style="color:#999; font-style:italic; font-size:13px;">Geen skills geregistreerd.</span>';
+                                        ?>
+                                    </div>
+                                </div>
+                                <div class="detail-item"><div class="label">Proficiency Level</div><div class="value">Niveau <strong><?php echo $form['proficiency_rating']; ?></strong> / 14</div></div>
+                            </div>
+                            <div class="detail-grid">
+                                <div class="detail-item"><div class="label">Complimenten</div><div class="value" style="color: #065f46; background: #d1fae5; padding: 10px; border-radius: 4px; border: 1px solid #6ee7b7;"><?php echo nl2br(htmlspecialchars($form['client_compliment'] ?: 'Geen complimenten.')); ?></div></div>
+                                <div class="detail-item"><div class="label">Waarschuwingen</div><div class="value" style="color: #c53030; background: #fff5f5; padding: 10px; border-radius: 4px; border: 1px solid #fed7d7;"><?php echo nl2br(htmlspecialchars($form['warnings'] ?: 'Geen waarschuwingen.')); ?></div></div>
+                            </div>
+                        </div>
+                    </div>
+                <?php endif; ?>
             </div>
 
             <div class="col-right">
                 <div class="card">
                     <div class="card-header">
-                        <span><span class="material-icons-outlined" style="vertical-align:middle; margin-right:8px;">forum</span>Tijdlijn & Notities</span>
+                        <span><span class="material-icons-outlined" style="vertical-align:middle; margin-right:8px;">forum</span>Notities & Chat</span>
                     </div>
                     <div class="card-body" style="background-color: #fcfcfc; max-height: 600px; overflow-y: auto;">
                         
@@ -392,11 +451,10 @@ function getInitials($name) {
                                         <div class="chat-meta">
                                             <span class="chat-name"><?php echo htmlspecialchars($isMe ? 'Ik' : $displayName); ?></span>
                                             <span><?php echo date('d-m-Y H:i', strtotime($note['note_date'])); ?></span>
-                                            
                                             <?php if ($canEdit): ?>
                                             <span class="chat-actions">
                                                 <span class="material-icons-outlined chat-action-icon" onclick="openEditNote(<?php echo $note['id']; ?>, '<?php echo addslashes(str_replace(["\r", "\n"], ['','\n'], $note['content'])); ?>')">edit</span>
-                                                <form method="POST" style="display:inline;" onsubmit="return confirm('Bericht verwijderen?');">
+                                                <form method="POST" style="display:inline;" onsubmit="return confirm('Verwijderen?');">
                                                     <?php echo csrf_field(); ?>
                                                     <input type="hidden" name="action" value="delete_note">
                                                     <input type="hidden" name="note_id" value="<?php echo $note['id']; ?>">
@@ -459,12 +517,7 @@ function getInitials($name) {
             editModal.style.display = 'flex';
         }
         function closeEditNote() { editModal.style.display = 'none'; }
-
         editModal.addEventListener('click', (e) => { if (e.target === editModal) closeEditNote(); });
-        document.addEventListener("DOMContentLoaded", function() {
-            var container = document.querySelector('.card-body[style*="overflow-y: auto"]');
-            if(container) container.scrollTop = 0; 
-        });
     </script>
 
 </body>
