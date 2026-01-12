@@ -322,7 +322,7 @@ function getInitials($name) {
                             <div style="margin-bottom: 24px;">
                                 <div class="label">Gemaakte Afspraken</div>
                                 <div class="value" style="background:#f0fdf4; color:#166534; padding:15px; border-radius:4px; border:1px solid #bbf7d0; text-align: left;">
-                                    <span class="material-icons-outlined" style="font-size:16px; vertical-align:middle; margin-right:5px;">handshake</span>
+                                    <span class="material-icons-outlined" style="font-size:16px; vertical-align:left; margin-right:5px;">handshake</span>
                                     <?php echo nl2br(htmlspecialchars($form['agreements'] ?: 'Geen afspraken vastgelegd.')); ?>
                                 </div>
                             </div>
