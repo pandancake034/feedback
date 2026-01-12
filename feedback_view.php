@@ -376,11 +376,12 @@ function getInitials($name) {
                         </div>
                         <div class="card-body">
                             <div style="margin-bottom: 20px;">
-                                <div class="label">Rijgedrag & Communicatie</div>
-                                <div class="value" style="background: #f9fafb; padding: 10px; border-radius: 4px; border: 1px solid #eee;">
-                                    <?php echo nl2br(htmlspecialchars($form['driving_behavior'] ?: 'Geen opmerkingen.')); ?>
-                                </div>
-                            </div>
+    <div class="label">Rijgedrag & Communicatie</div>
+    
+    <div class="value" style="background: #f9fafb; padding: 10px; border-radius: 4px; border: 1px solid #eee; text-align: left;">
+        <?php echo nl2br(htmlspecialchars($form['driving_behavior'] ?: 'Geen opmerkingen.')); ?>
+    </div>
+</div>
                             <div class="detail-grid" style="margin-bottom: 20px;">
                                 <div class="detail-item">
                                     <div class="label">Skills / Rollen</div>
