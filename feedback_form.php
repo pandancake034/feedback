@@ -1,8 +1,8 @@
 <?php
 /**
  * FEEDBACK_FORM.PHP
- * Versie: Split-Screen & Dynamische velden (Algemeen vs KPI)
- * Gebruikt de bestaande logica en voegt nieuwe functies toe.
+ * Versie: Gecentreerd formulier & Dynamische velden (Algemeen vs KPI)
+ * Update: Notitieblok rechts verwijderd, formulier weer gecentreerd.
  */
 
 require_once __DIR__ . '/config/config.php';
@@ -19,7 +19,6 @@ $is_new  = empty($form_id);
 $error   = "";
 $drivers = []; 
 $prev_forms = []; // Voor dropdown bij algemene beoordeling
-$notes_history = []; // Voor rechter zijbalk
 
 // Standaard waarden instellen
 $data = [
@@ -31,13 +30,13 @@ $data = [
     'start_date' => date('Y-m-d', strtotime('-1 week')),
     'review_moment' => '',
     
-    // KPI Velden (Huidige code)
+    // KPI Velden
     'otd_score' => '', 
     'ftr_score' => '', 
     'kw_score' => '', 
     'routes_count' => 0,
     'errors_text' => '', 
-    'nokd_text' => '', // Veld uit jouw DB schema
+    'nokd_text' => '', 
     'late_text' => '', 
     'driving_behavior' => '',
     'warnings' => '', 
@@ -79,17 +78,8 @@ if (!$is_new) {
             die("Formulier niet gevonden.");
         }
 
-        // C. Haal notities op voor zijbalk (NIEUW)
+        // C. Haal eerdere gesprekken op voor referentie
         if (!empty($data['driver_id'])) {
-            $stmtNotes = $pdo->prepare("SELECT n.*, u.first_name, u.last_name, u.email 
-                                        FROM notes n 
-                                        LEFT JOIN users u ON n.user_id = u.id 
-                                        WHERE n.driver_id = ? 
-                                        ORDER BY n.note_date DESC LIMIT 10");
-            $stmtNotes->execute([$data['driver_id']]);
-            $notes_history = $stmtNotes->fetchAll(PDO::FETCH_ASSOC);
-
-            // D. Haal eerdere gesprekken op voor referentie
             $stmtPrev = $pdo->prepare("SELECT id, form_date, review_moment FROM feedback_forms WHERE driver_id = ? AND id != ? ORDER BY form_date DESC");
             $stmtPrev->execute([$data['driver_id'], $form_id]);
             $prev_forms = $stmtPrev->fetchAll(PDO::FETCH_ASSOC);
@@ -147,7 +137,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $otd_score = str_replace('%', '', $_POST['otd_score'] ?? '') . '%'; if($otd_score === '%') $otd_score = '';
         $ftr_score = str_replace('%', '', $_POST['ftr_score'] ?? '') . '%'; if($ftr_score === '%') $ftr_score = '';
 
-        // Alle parameters verzamelen (KPI + NIEUWE VELDEN)
+        // Alle parameters verzamelen
         $params = [
             $driver_id,
             $_SESSION['user_id'], // created_by
@@ -159,7 +149,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $otd_score,
             $ftr_score,
             $_POST['errors_text'] ?? '',
-            '', // nokd_text (laten we leeg of vul hier iets in als je dat veld gebruikt)
+            '', 
             $_POST['late_text'] ?? '',
             $_POST['driving_behavior'] ?? '',
             $_POST['warnings'] ?? '',
@@ -192,7 +182,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $stmt->execute($params);
             
         } else {
-            // UPDATE (Let op: created_by_user_id halen we uit de params want die updaten we niet)
+            // UPDATE
             array_splice($params, 1, 1); 
             $params[] = $form_id;
 
@@ -226,7 +216,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
-        /* --- BESTAANDE STYLE (Enterprise Theme) --- */
+        /* --- CORE THEME --- */
         :root { --brand-color: #0176d3; --brand-dark: #014486; --sidebar-bg: #1a2233; --bg-body: #f3f2f2; --text-main: #181818; --text-secondary: #706e6b; --border-color: #dddbda; }
         body { margin: 0; font-family: 'Segoe UI', sans-serif; background: var(--bg-body); color: var(--text-main); display: flex; height: 100vh; overflow: hidden; }
         * { box-sizing: border-box; }
@@ -234,10 +224,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         .sidebar { width: 240px; background: var(--sidebar-bg); color: white; display: flex; flex-direction: column; flex-shrink: 0; }
         .main-content { flex-grow: 1; display: flex; flex-direction: column; overflow-y: auto; }
         
-        /* NIEUWE SPLIT LAYOUT */
-        .page-wrapper { display: flex; gap: 24px; padding: 24px; max-width: 1600px; margin: 0 auto; width: 100%; align-items: flex-start; padding-bottom: 100px; }
-        .col-form { flex: 2; min-width: 0; }
-        .col-notes { flex: 1; min-width: 350px; position: sticky; top: 24px; }
+        /* Gecentreerde pagina */
+        .page-body { padding: 24px; max-width: 1000px; margin: 0 auto; width: 100%; padding-bottom: 100px; }
 
         .card { background: white; border: 1px solid var(--border-color); border-radius: 4px; box-shadow: 0 2px 2px rgba(0,0,0,0.1); margin-bottom: 24px; overflow: hidden; }
         .form-section-title { background: #f8f9fa; padding: 12px 20px; font-weight: 700; border-bottom: 1px solid var(--border-color); margin: 0; font-size: 14px; display: flex; align-items: center; gap: 8px; }
@@ -249,11 +237,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         input, select, textarea { width: 100%; padding: 8px 12px; border: 1px solid #dddbda; border-radius: 4px; font-size: 14px; font-family: inherit; }
         input:focus, textarea:focus { border-color: var(--brand-color); outline: none; }
         textarea { resize: vertical; min-height: 80px; }
-
-        /* Notes Styling */
-        .notes-list { max-height: 600px; overflow-y: auto; padding-right: 5px; }
-        .note-item { background: #fcfcfc; border: 1px solid #eee; border-radius: 6px; padding: 12px; margin-bottom: 10px; font-size: 13px; }
-        .note-meta { display: flex; justify-content: space-between; color: #999; font-size: 11px; margin-bottom: 6px; }
 
         /* Toggle & Skills */
         .toggle-wrapper { display: inline-flex; background: #f3f2f2; padding: 4px; border-radius: 6px; border: 1px solid var(--border-color); }
@@ -287,267 +270,3 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     </aside>
 
     <main class="main-content">
-        <form method="POST">
-            <div class="page-wrapper">
-                
-                <div class="col-form">
-                    <h1 style="margin-top: 0; margin-bottom: 20px;">
-                        <?php echo $is_new ? 'Nieuw feedbackgesprek' : 'Gesprek Bewerken'; ?>
-                    </h1>
-
-                    <?php if ($error): ?>
-                        <div style="background: #fde8e8; color: #ea001e; padding: 10px; border-radius: 4px; margin-bottom: 20px; border: 1px solid #fbd5d5;"><?php echo $error; ?></div>
-                    <?php endif; ?>
-
-                    <div class="card">
-                        <h3 class="form-section-title"><span class="material-icons-outlined">person</span> 1. Chauffeur & Planning</h3>
-                        <div class="card-body">
-                            
-                            <?php if ($is_new): ?>
-                                <div class="form-group">
-                                    <label style="margin-bottom:8px;">Wie wil je bespreken?</label>
-                                    <div class="toggle-wrapper">
-                                        <input type="radio" name="driver_mode" id="mode_existing" value="existing" checked onclick="toggleDriverMode('existing')">
-                                        <label for="mode_existing" class="toggle-option">Bestaande chauffeur</label>
-
-                                        <input type="radio" name="driver_mode" id="mode_new" value="new" onclick="toggleDriverMode('new')">
-                                        <label for="mode_new" class="toggle-option">Nieuwe chauffeur</label>
-                                    </div>
-                                </div>
-
-                                <div id="block-existing" class="form-group" style="margin-top: 15px;">
-                                    <label>Selecteer chauffeur *</label>
-                                    <select name="existing_driver_id">
-                                        <option value="">-- Kies uit lijst --</option>
-                                        <?php foreach ($drivers as $d): ?>
-                                            <option value="<?php echo $d['id']; ?>" <?php if(isset($_GET['prefill_driver']) && $_GET['prefill_driver'] == $d['id']) echo 'selected'; ?>><?php echo htmlspecialchars($d['name']); ?> (<?php echo htmlspecialchars($d['employee_id']); ?>)</option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                </div>
-
-                                <div id="block-new" class="form-grid hidden" style="margin-top: 15px;">
-                                    <div class="form-group"><label>Naam chauffeur *</label><input type="text" name="driver_name" placeholder="Bijv. Jan Jansen"></div>
-                                    <div class="form-group"><label>Personeelsnummer *</label><input type="text" name="employee_id" placeholder="Bijv. 12345"></div>
-                                </div>
-                            <?php else: ?>
-                                <div class="form-grid">
-                                    <div class="form-group"><label>Naam chauffeur *</label><input type="text" name="driver_name" value="<?php echo htmlspecialchars($data['driver_name']); ?>" required></div>
-                                    <div class="form-group"><label>Personeelsnummer *</label><input type="text" name="employee_id" value="<?php echo htmlspecialchars($data['employee_id']); ?>" required></div>
-                                </div>
-                            <?php endif; ?>
-
-                            <div class="form-grid">
-                                <div class="form-group">
-                                    <label>Uitzendbureau:</label>
-                                    <input type="text" name="agency" list="agency_options" value="<?php echo htmlspecialchars($data['agency']); ?>" placeholder="Typ of kies...">
-                                    <datalist id="agency_options"><option value="Young Capital"><option value="LevelWorks"><option value="NowJobs"><option value="Timing"></datalist>
-                                </div>
-                                <div class="form-group"><label>Datum gesprek *</label><input type="date" name="form_date" value="<?php echo htmlspecialchars($data['form_date']); ?>" required></div>
-                                <div class="form-group"><label>Startdatum chauffeur *</label><input type="date" name="start_date" value="<?php echo htmlspecialchars($data['start_date']); ?>" required></div>
-                                <div class="form-group">
-                                    <label style="color:var(--brand-color);">Beoordelingsmoment *</label>
-                                    <select name="review_moment" id="reviewSelector" onchange="toggleFormType()" style="border:2px solid var(--brand-color); background:#f0f9ff; font-weight:600;">
-                                        <option value="">-- Kies --</option>
-                                        <option value="8 ritten" <?php if($data['review_moment'] == '8 ritten' || $data['review_moment'] == '8 weken') echo 'selected'; ?>>8 ritten</option>
-                                        <option value="40 ritten" <?php if($data['review_moment'] == '40 ritten') echo 'selected'; ?>>40 ritten</option>
-                                        <option value="80 ritten" <?php if($data['review_moment'] == '80 ritten') echo 'selected'; ?>>80 ritten</option>
-                                        <option value="Algemene beoordeling" <?php if($data['review_moment'] == 'Algemene beoordeling') echo 'selected'; ?>>Algemene beoordeling (Nieuw)</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div id="kpiForm">
-                        <div class="card">
-                            <h3 class="form-section-title"><span class="material-icons-outlined">analytics</span> 2. Prestaties</h3>
-                            <div class="card-body">
-                                <div class="form-grid">
-                                    <div class="form-group"><label>OTD score:</label><input type="text" name="otd_score" id="otd_score" value="<?php echo htmlspecialchars($data['otd_score']); ?>" placeholder="98%"></div>
-                                    <div class="form-group"><label>FTR score:</label><input type="text" name="ftr_score" id="ftr_score" value="<?php echo htmlspecialchars($data['ftr_score']); ?>" placeholder="99.5%"></div>
-                                    <div class="form-group"><label>KW verbruik E-vito:</label><input type="text" name="kw_score" value="<?php echo htmlspecialchars($data['kw_score']); ?>"></div>
-                                    <div class="form-group"><label>Aantal routes:</label><input type="number" name="routes_count" value="<?php echo htmlspecialchars($data['routes_count']); ?>"></div>
-                                </div>
-                                <div class="form-grid" style="margin-top: 15px;">
-                                    <div class="form-group"><label>Fouten (errors):</label><textarea name="errors_text"><?php echo htmlspecialchars($data['errors_text']); ?></textarea></div>
-                                    <div class="form-group"><label>Te laat:</label><textarea name="late_text"><?php echo htmlspecialchars($data['late_text']); ?></textarea></div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="card">
-                            <h3 class="form-section-title"><span class="material-icons-outlined">psychology</span> 3. Gedrag & Beoordeling</h3>
-                            <div class="card-body">
-                                <div class="form-group"><label>Rijgedrag & Communicatie</label><textarea name="driving_behavior"><?php echo htmlspecialchars($data['driving_behavior']); ?></textarea></div>
-                                <div class="form-group"><label>Waarschuwingen</label><textarea name="warnings" style="border-color: #fca5a5;"><?php echo htmlspecialchars($data['warnings']); ?></textarea></div>
-                                <div class="form-group"><label>Complimenten</label><textarea name="client_compliment" style="border-color: #86efac;"><?php echo htmlspecialchars($data['client_compliment']); ?></textarea></div>
-                                <div class="form-grid">
-                                    <div class="form-group">
-                                        <label>Skills / Rollen</label>
-                                        <select id="skillSelector" onchange="addSkill(this.value)">
-                                            <option value="">-- Kies een skill --</option>
-                                            <option value="Laden+rit">Laden+rit</option><option value="Laden/Reserve">Laden/Reserve</option><option value="Parkeerwachter">Parkeerwachter</option><option value="Inchecken">Inchecken</option><option value="Laadcoördinator">Laadcoördinator</option>
-                                        </select>
-                                        <div id="skillsContainer" class="skills-container"></div>
-                                        <input type="hidden" name="skills_rating" id="skillsInput" value="<?php echo htmlspecialchars($data['skills_rating']); ?>">
-                                    </div>
-                                    <div class="form-group">
-                                        <label>Proficiency Level (1-14)</label>
-                                        <select name="proficiency_rating">
-                                            <option value="0">-- Kies --</option>
-                                            <?php for($i=1;$i<=14;$i++): ?><option value="<?php echo $i; ?>" <?php if($data['proficiency_rating']==$i) echo 'selected'; ?>><?php echo $i; ?></option><?php endfor; ?>
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div id="generalForm" class="hidden">
-                        <div class="card section-highlight">
-                            <h3 class="form-section-title" style="background:#e0e7ff; color:#014486;">
-                                <span class="material-icons-outlined">forum</span> 2. Algemeen Gesprek
-                            </h3>
-                            <div class="card-body">
-                                <div class="form-grid">
-                                    <div class="form-group">
-                                        <label>Reden gesprek</label>
-                                        <input type="text" name="conversation_reason" placeholder="Bijv. Functioneren, Klacht, Verzuim..." value="<?php echo htmlspecialchars($data['conversation_reason']); ?>">
-                                    </div>
-                                    <div class="form-group">
-                                        <label>Vorig gesprek (Referentie)</label>
-                                        <select name="linked_form_id">
-                                            <option value="">-- Geen --</option>
-                                            <?php foreach($prev_forms as $pf): ?>
-                                                <option value="<?php echo $pf['id']; ?>" <?php if($data['linked_form_id'] == $pf['id']) echo 'selected'; ?>>
-                                                    <?php echo date('d-m-Y', strtotime($pf['form_date'])) . ' - ' . $pf['review_moment']; ?>
-                                                </option>
-                                            <?php endforeach; ?>
-                                        </select>
-                                    </div>
-                                </div>
-
-                                <div class="form-group">
-                                    <label>Opmerkingen & Vragen</label>
-                                    <textarea name="general_comments" style="min-height:120px;" placeholder="Wat is er besproken?"><?php echo htmlspecialchars($data['general_comments']); ?></textarea>
-                                </div>
-
-                                <div class="form-group">
-                                    <label>Gemaakte Afspraken</label>
-                                    <textarea name="agreements" style="min-height:100px; border-color:#86efac;" placeholder="Wat spreken we af?"><?php echo htmlspecialchars($data['agreements']); ?></textarea>
-                                </div>
-
-                                <div class="form-group">
-                                    <label>Overige</label>
-                                    <textarea name="misc_comments"><?php echo htmlspecialchars($data['misc_comments']); ?></textarea>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                </div>
-
-                <div class="col-notes">
-                    <div class="card">
-                        <h3 class="form-section-title"><span class="material-icons-outlined">history_edu</span> Notitie Historie</h3>
-                        <div class="card-body">
-                            <p style="font-size:12px; color:#777; margin-top:0;">Laatste 10 notities:</p>
-                            <div class="notes-list">
-                                <?php if(empty($notes_history)): ?>
-                                    <div style="text-align:center; color:#aaa; font-style:italic; padding:10px;">Geen notities.</div>
-                                <?php else: ?>
-                                    <?php foreach($notes_history as $n): ?>
-                                        <div class="note-item">
-                                            <div class="note-meta">
-                                                <span><?php echo htmlspecialchars($n['first_name'] ?: $n['email']); ?></span>
-                                                <span><?php echo date('d-m-Y', strtotime($n['note_date'])); ?></span>
-                                            </div>
-                                            <div style="white-space: pre-wrap;"><?php echo htmlspecialchars($n['content']); ?></div>
-                                        </div>
-                                    <?php endforeach; ?>
-                                <?php endif; ?>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-            </div>
-
-            <div class="action-bar">
-                <a href="dashboard.php" class="btn btn-cancel">Annuleren</a>
-                <button type="submit" name="action" value="save" class="btn btn-save" style="background-color: white; color: var(--brand-color); border: 1px solid var(--brand-color);">Concept Opslaan</button>
-                <button type="submit" name="action" value="complete" class="btn btn-save">Opslaan</button>
-            </div>
-        </form>
-    </main>
-    
-    <script>
-        // 1. WISSELEN FORM TYPE
-        function toggleFormType() {
-            const selector = document.getElementById('reviewSelector');
-            const kpiForm = document.getElementById('kpiForm');
-            const generalForm = document.getElementById('generalForm');
-            
-            if(selector && kpiForm && generalForm) {
-                if (selector.value === 'Algemene beoordeling') {
-                    kpiForm.style.display = 'none';
-                    generalForm.style.display = 'block';
-                } else {
-                    kpiForm.style.display = 'block';
-                    generalForm.style.display = 'none';
-                }
-            }
-        }
-
-        // 2. TOGGLE DRIVER MODE
-        function toggleDriverMode(mode) {
-            const blockExisting = document.getElementById('block-existing');
-            const blockNew = document.getElementById('block-new');
-            if (mode === 'existing') {
-                blockExisting.classList.remove('hidden'); blockNew.classList.add('hidden');
-            } else {
-                blockExisting.classList.add('hidden'); blockNew.classList.remove('hidden');
-            }
-        }
-
-        // 3. SKILLS TAGS
-        const skillsInput = document.getElementById('skillsInput');
-        const skillsContainer = document.getElementById('skillsContainer');
-        const skillSelector = document.getElementById('skillSelector');
-        let currentSkills = skillsInput && skillsInput.value ? skillsInput.value.split(',').filter(s => s.trim() !== '') : [];
-
-        function renderSkills() {
-            if(!skillsContainer) return;
-            skillsContainer.innerHTML = ''; 
-            currentSkills.forEach((skill, index) => {
-                const tag = document.createElement('div');
-                tag.className = 'skill-tag';
-                tag.innerHTML = `${skill} <span onclick="removeSkill(${index})">&times;</span>`;
-                skillsContainer.appendChild(tag);
-            });
-            if(skillsInput) skillsInput.value = currentSkills.join(',');
-        }
-        function addSkill(skill) {
-            if (skill && !currentSkills.includes(skill)) { currentSkills.push(skill); renderSkills(); }
-            if(skillSelector) skillSelector.value = "";
-        }
-        function removeSkill(index) { currentSkills.splice(index, 1); renderSkills(); }
-
-        // Formatting
-        function formatPercentage(input) {
-            let val = input.value.trim().replace(/%/g, '');
-            if (val !== '') input.value = val + '%';
-        }
-        const otdInput = document.getElementById('otd_score');
-        const ftrInput = document.getElementById('ftr_score');
-        if (otdInput) otdInput.addEventListener('blur', function() { formatPercentage(this); });
-        if (ftrInput) ftrInput.addEventListener('blur', function() { formatPercentage(this); });
-
-        // Init
-        window.addEventListener('DOMContentLoaded', () => {
-            toggleFormType();
-            renderSkills();
-        });
-    </script>
-</body>
-</html>
