@@ -264,7 +264,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         <div style="height: 60px; display: flex; align-items: center; padding: 0 20px; font-weight: 700; background: rgba(0,0,0,0.2);">FeedbackFlow</div>
         <div style="padding: 20px;">
             <a href="dashboard.php" style="color: #b0b6c3; text-decoration: none; display: flex; align-items: center; gap: 10px;">
-                <span class="material-icons-outlined">dashboard</span> Terug naar Dashboard
+                <span class="material-icons-outlined">dashboard</span> Terug naar dashboard
             </a>
         </div>
     </aside>
@@ -334,7 +334,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                     <option value="8 ritten" <?php if($data['review_moment'] == '8 ritten' || $data['review_moment'] == '8 weken') echo 'selected'; ?>>8 ritten</option>
                                     <option value="40 ritten" <?php if($data['review_moment'] == '40 ritten') echo 'selected'; ?>>40 ritten</option>
                                     <option value="80 ritten" <?php if($data['review_moment'] == '80 ritten') echo 'selected'; ?>>80 ritten</option>
-                                    <option value="Algemene beoordeling" <?php if($data['review_moment'] == 'Algemene beoordeling') echo 'selected'; ?>>Algemene beoordeling (Nieuw)</option>
+                                    <option value="Algemene beoordeling" <?php if($data['review_moment'] == 'Algemene beoordeling') echo 'selected'; ?>>Algemene beoordeling</option>
                                 </select>
                             </div>
                         </div>
