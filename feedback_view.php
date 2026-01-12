@@ -295,12 +295,12 @@ function getInitials($name) {
                             <div class="detail-grid" style="margin-bottom:20px;">
                                 <div class="detail-item">
                                     <div class="label">Reden van gesprek</div>
-                                    <div class="value" style="font-size:16px; font-weight:600;"><?php echo htmlspecialchars($form['conversation_reason'] ?: 'Geen reden opgegeven'); ?></div>
+                                    <div class="value" style="font-size:16px; font-weight:600; text-align: left;"><?php echo htmlspecialchars($form['conversation_reason'] ?: 'Geen reden opgegeven'); ?></div>
                                 </div>
                                 <?php if($linkedFormDate): ?>
                                 <div class="detail-item">
                                     <div class="label">Referentie naar vorig gesprek</div>
-                                    <div class="value">
+                                    <div class="value" style="text-align: left;">
                                         <a href="feedback_view.php?id=<?php echo $form['linked_form_id']; ?>" style="color:var(--brand-color); text-decoration:none; display:flex; align-items:center; gap:5px;">
                                             <span class="material-icons-outlined" style="font-size:16px;">link</span>
                                             <?php echo htmlspecialchars($linkedFormDate); ?>
@@ -322,7 +322,7 @@ function getInitials($name) {
                             <div style="margin-bottom: 24px;">
                                 <div class="label">Gemaakte Afspraken</div>
                                 <div class="value" style="background:#f0fdf4; color:#166534; padding:15px; border-radius:4px; border:1px solid #bbf7d0; text-align: left;">
-                                    <span class="material-icons-outlined" style="font-size:16px; vertical-align:left; margin-right:5px;">handshake</span>
+                                    <span class="material-icons-outlined" style="font-size:16px; vertical-align:middle; margin-right:5px;">handshake</span>
                                     <?php echo nl2br(htmlspecialchars($form['agreements'] ?: 'Geen afspraken vastgelegd.')); ?>
                                 </div>
                             </div>
@@ -333,6 +333,10 @@ function getInitials($name) {
                                 <div class="value" style="text-align: left;"><?php echo nl2br(htmlspecialchars($form['misc_comments'])); ?></div>
                             </div>
                             <?php endif; ?>
+                        </div>
+                    </div>
+
+                <?php else: ?>
                         </div>
                     </div>
 
