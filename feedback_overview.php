@@ -231,7 +231,7 @@ function get_page_link($pageNum) {
                             <tr>
                                 <th>Datum</th>
                                 <th>Chauffeur</th>
-                                <th>Type / Moment</th>
+                                <th>Moment</th>
                                 <th>Status</th>
                                 <th>Toegewezen aan</th>
                                 <th>Gemaakt door</th>
