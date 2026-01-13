@@ -410,7 +410,7 @@ if (isset($_GET['msg'])) {
                     <div class="form-group">
                         <label>Rol</label>
                         <select name="role" id="inputRole" class="form-control">
-                            <option value="user">Gebruiker</option>
+                            <option value="user"></option>Teamleider
                             <option value="admin">Administrator</option>
                         </select>
                     </div>

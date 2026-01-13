@@ -40,7 +40,8 @@
                 };
                 const timeString = now.toLocaleDateString('nl-NL', options).replace(',', '');
                 const clockEl = document.getElementById('clock-text');
-                if(clockEl) clockEl.innerText = timeString.charAt(0).toUpperCase() + timeString.slice(1);
+                if(clockEl) clockEl.innerText = timeString;
+
             }
             setInterval(updateClock, 1000);
             updateClock(); // Direct uitvoeren bij laden
