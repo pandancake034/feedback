@@ -205,13 +205,56 @@ function getInitials($name) {
 
         /* Print Style */
         .print-only-logo { display: none; }
+        
         @media print {
-            .sidebar, .top-header, .btn-action, .btn-add, .note-input, .no-print, .chat-actions { display: none !important; }
-            body, .main-content, .content-body { display: block !important; height: auto !important; background: white !important; padding: 0 !important; margin: 0 !important; }
-            .col-left, .col-right { width: 100% !important; flex: none !important; margin-bottom: 20px; }
-            .card { box-shadow: none !important; border: 1px solid #ccc !important; break-inside: avoid; }
-            .print-only-logo { display: block !important; max-width: 150px; margin-bottom: 20px; }
+            /* 1. Verberg navigatie, knoppen en invoervelden */
+            .sidebar, .top-header, .btn-action, .btn-add, .note-input, .no-print, .chat-actions { 
+                display: none !important; 
+            }
+
+            /* 2. Verberg de notitie-kolom (Rechts) */
+            .col-right { 
+                display: none !important; 
+            }
+
+            /* 3. Zorg dat de hoofdinhoud (Links) de volledige breedte pakt */
+            .col-left { 
+                width: 100% !important; 
+                flex: none !important; 
+                margin: 0 !important; 
+            }
+
+            /* 4. Reset marges en achtergronden voor papier */
+            body, .main-content, .content-body { 
+                display: block !important; 
+                height: auto !important; 
+                background: white !important; 
+                padding: 0 !important; 
+                margin: 0 !important; 
+                width: 100% !important;
+            }
+
+            /* 5. Styling voor kaarten op papier */
+            .card { 
+                box-shadow: none !important; 
+                border: 1px solid #ccc !important; 
+                break-inside: avoid; /* Voorkom dat kaarten halverwege pagina breken */
+                margin-bottom: 20px;
+            }
+
+            /* 6. Logo zichtbaar maken op print */
+            .print-only-logo { 
+                display: block !important; 
+                max-width: 150px; 
+                margin-bottom: 20px; 
+            }
             .profile-avatar { display: none; } 
+
+            /* 7. VERBERG BROWSER HEADER/FOOTER (URL & Datum) */
+            @page { 
+                margin: 1cm; /* Geeft een nette witmarge zonder browser-tekst */
+                size: auto;  
+            }
         }
     </style>
 </head>
