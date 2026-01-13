@@ -15,7 +15,7 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
-$page_title = 'Statistieken';
+$page_title = APP_TITLE;
 
 // 2. DATA OPHALEN
 // We initialiseren de array voor de 3 meetmomenten

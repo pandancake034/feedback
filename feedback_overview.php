@@ -43,7 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // 3. CONFIGURATIE VOOR HEADER & PAGINERING
-$page_title = 'Feedback overzicht'; 
+$page_title = APP_TITLE;
 $limit = 15; 
 $page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int)$_GET['page'] : 1;
 if ($page < 1) $page = 1;
