@@ -97,8 +97,9 @@ $chartDataFTR = [
         .sidebar-header { height: 60px; padding: 0 20px; display: flex; align-items: center; background: rgba(0,0,0,0.2); border-bottom: 1px solid rgba(255,255,255,0.1); }
         .sidebar-logo { max-height: 40px; }
         .nav-list { list-style: none; padding: 20px 0; margin: 0; }
-        .nav-item a { display: flex; align-items: center; padding: 12px 20px; color: #b0b6c3; text-decoration: none; transition: 0.2s; font-size: 14px; }
-        .nav-item a:hover, .nav-item a.active { background: rgba(255,255,255,0.1); color: white; border-left: 4px solid var(--brand-color); }
+        .nav-item a { display: flex; align-items: center; padding: 12px 20px; color: #b0b6c3; text-decoration: none; transition: all 0.25s ease; border-left: 4px solid transparent; font-size: 14px; }
+        .nav-item a:hover { background: rgba(255,255,255,0.06); color: #e0e6ed; }
+        .nav-item a.active { background: linear-gradient(90deg, rgba(1,118,211,0.25) 0%, rgba(1,118,211,0.05) 100%); color: white; border-left: 4px solid var(--brand-color); box-shadow: inset 3px 0 8px rgba(1,118,211,0.15); }
         .nav-item .material-icons-outlined { margin-right: 12px; }
 
         .main-content { flex-grow: 1; display: flex; flex-direction: column; overflow-y: auto; }
@@ -106,7 +107,8 @@ $chartDataFTR = [
         .page-body { padding: 24px; max-width: 1400px; margin: 0 auto; width: 100%; }
 
         /* Cards */
-        .card { background: white; border: 1px solid var(--border-color); border-radius: 4px; box-shadow: 0 2px 2px rgba(0,0,0,0.1); margin-bottom: 24px; padding: 20px; }
+        .card { background: white; border: 1px solid var(--border-color); border-radius: 4px; box-shadow: 0 2px 2px rgba(0,0,0,0.1); margin-bottom: 24px; padding: 20px; transition: box-shadow 0.2s ease, transform 0.2s ease; }
+        .card:hover { box-shadow: 0 6px 16px rgba(0,0,0,0.12); transform: translateY(-2px); }
         .chart-container { width: 100%; height: 450px; }
         
         /* Stats Grid */
@@ -116,6 +118,12 @@ $chartDataFTR = [
         .stat-label { font-size: 12px; color: var(--text-secondary); text-transform: uppercase; font-weight: 700; margin-top: 5px; letter-spacing: 0.5px; }
 
         h1, h3 { color: var(--text-main); font-weight: 600; }
+
+        /* Table improvements */
+        tr:nth-child(even) td { background: #fafbfc; }
+        tr:hover td { background: #f0f7ff; }
+        tr:hover td:first-child { border-left: 3px solid var(--brand-color); }
+        thead th { position: sticky; top: 0; background: white; z-index: 2; }
     </style>
 </head>
 <body>

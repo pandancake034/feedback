@@ -105,7 +105,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         .sidebar { width: 240px; background: var(--sidebar-bg); color: white; display: flex; flex-direction: column; flex-shrink: 0; }
         .main-content { flex-grow: 1; display: flex; flex-direction: column; overflow-y: auto; }
         .page-body { padding: 24px; max-width: 800px; margin: 0 auto; width: 100%; }
-        .card { background: white; border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; margin-bottom: 20px; }
+        .card { background: white; border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; margin-bottom: 20px; transition: box-shadow 0.2s ease, transform 0.2s ease; }
+        .card:hover { box-shadow: 0 6px 16px rgba(0,0,0,0.12); transform: translateY(-2px); }
         .form-section-title { background: #f3f2f2; padding: 10px 20px; font-weight: 700; border-bottom: 1px solid var(--border-color); margin: 0; }
         .card-body { padding: 20px; }
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
@@ -116,6 +117,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         .btn-save { background: var(--brand-color); color: white; float: right; }
         .alert-error { background: #fde8e8; color: #ea001e; padding: 10px; border-radius: 4px; margin-bottom: 20px; border: 1px solid #fbd5d5; }
         
+        /* Sidebar Nav */
+        .nav-list { list-style: none; padding: 20px 0; margin: 0; }
+        .nav-item a { display: flex; align-items: center; padding: 12px 20px; color: #b0b6c3; text-decoration: none; transition: all 0.25s ease; border-left: 4px solid transparent; font-size: 14px; }
+        .nav-item a:hover { background: rgba(255,255,255,0.06); color: #e0e6ed; }
+        .nav-item a.active { background: linear-gradient(90deg, rgba(1,118,211,0.25) 0%, rgba(1,118,211,0.05) 100%); color: white; border-left: 4px solid var(--brand-color); box-shadow: inset 3px 0 8px rgba(1,118,211,0.15); }
+        .nav-item .material-icons-outlined { margin-right: 12px; }
+
         /* Toggle Switch Stijl */
         .toggle-container { display: flex; gap: 15px; margin-bottom: 15px; }
         .radio-label { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 14px; }

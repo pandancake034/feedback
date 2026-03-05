@@ -124,8 +124,9 @@ function getInitials($name) {
         .sidebar-header { height: 60px; padding: 0 20px; display: flex; align-items: center; background: rgba(0,0,0,0.2); border-bottom: 1px solid rgba(255,255,255,0.1); }
         .sidebar-logo { max-height: 40px; }
         .nav-list { list-style: none; padding: 20px 0; margin: 0; flex-grow: 1; }
-        .nav-item a { display: flex; align-items: center; padding: 12px 20px; color: #b0b6c3; text-decoration: none; transition: 0.2s; font-size: 14px; }
-        .nav-item a:hover, .nav-item a.active { background: rgba(255,255,255,0.1); color: white; border-left: 4px solid var(--brand-color); }
+        .nav-item a { display: flex; align-items: center; padding: 12px 20px; color: #b0b6c3; text-decoration: none; transition: all 0.25s ease; border-left: 4px solid transparent; font-size: 14px; }
+        .nav-item a:hover { background: rgba(255,255,255,0.06); color: #e0e6ed; }
+        .nav-item a.active { background: linear-gradient(90deg, rgba(1,118,211,0.25) 0%, rgba(1,118,211,0.05) 100%); color: white; border-left: 4px solid var(--brand-color); box-shadow: inset 3px 0 8px rgba(1,118,211,0.15); }
         .nav-item .material-icons-outlined { margin-right: 12px; }
         .main-content { flex-grow: 1; display: flex; flex-direction: column; overflow-y: auto; }
         .top-header { height: 60px; background: white; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; padding: 0 24px; flex-shrink: 0; }
@@ -134,7 +135,8 @@ function getInitials($name) {
         .col-left { flex: 2; display: flex; flex-direction: column; gap: 24px; min-width: 0; }
         .col-right { flex: 1; min-width: 350px; }
 
-        .card { background: white; border: 1px solid var(--border-color); border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); overflow: hidden; }
+        .card { background: white; border: 1px solid var(--border-color); border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); overflow: hidden; transition: box-shadow 0.2s ease, transform 0.2s ease; }
+        .card:hover { box-shadow: 0 6px 16px rgba(0,0,0,0.12); transform: translateY(-2px); }
         .card-header { padding: 16px 20px; background: #fff; border-bottom: 1px solid #f0f0f0; font-weight: 700; font-size: 15px; display: flex; justify-content: space-between; align-items: center; color: var(--brand-color); }
         .card-body { padding: 20px; }
 

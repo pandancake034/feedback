@@ -269,8 +269,9 @@ if (isset($_GET['ajax_pagination'])) {
         .sidebar-header { height: 60px; padding: 0 20px; display: flex; align-items: center; background: rgba(0,0,0,0.2); border-bottom: 1px solid rgba(255,255,255,0.1); }
         .sidebar-logo { max-height: 40px; }
         .nav-list { list-style: none; padding: 20px 0; margin: 0; }
-        .nav-item a { display: flex; align-items: center; padding: 12px 20px; color: #b0b6c3; text-decoration: none; transition: 0.2s; font-size: 14px; }
-        .nav-item a:hover, .nav-item a.active { background: rgba(255,255,255,0.1); color: white; border-left: 4px solid var(--brand-color); }
+        .nav-item a { display: flex; align-items: center; padding: 12px 20px; color: #b0b6c3; text-decoration: none; transition: all 0.25s ease; border-left: 4px solid transparent; font-size: 14px; }
+        .nav-item a:hover { background: rgba(255,255,255,0.06); color: #e0e6ed; }
+        .nav-item a.active { background: linear-gradient(90deg, rgba(1,118,211,0.25) 0%, rgba(1,118,211,0.05) 100%); color: white; border-left: 4px solid var(--brand-color); box-shadow: inset 3px 0 8px rgba(1,118,211,0.15); }
         .nav-item .material-icons-outlined { margin-right: 12px; }
 
         .main-content { flex-grow: 1; display: flex; flex-direction: column; overflow-y: auto; }
@@ -279,7 +280,8 @@ if (isset($_GET['ajax_pagination'])) {
 
         /* Cards & Grid */
         .grid-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
-        .card { background: white; border: 1px solid var(--border-color); border-radius: 4px; box-shadow: 0 2px 2px rgba(0,0,0,0.1); margin-bottom: 24px; }
+        .card { background: white; border: 1px solid var(--border-color); border-radius: 4px; box-shadow: 0 2px 2px rgba(0,0,0,0.1); margin-bottom: 24px; transition: box-shadow 0.2s ease, transform 0.2s ease; }
+        .card:hover { box-shadow: 0 6px 16px rgba(0,0,0,0.12); transform: translateY(-2px); }
         .card-body { padding: 16px; }
         .kpi-value { font-size: 32px; font-weight: 300; } .kpi-label { font-size: 13px; color: var(--text-secondary); }
         .alert-toast { background: var(--success-bg); color: var(--success-text); padding: 10px 15px; border-radius: 4px; margin-bottom: 20px; border: 1px solid #a7f3d0; display: flex; align-items: center; gap: 10px; font-size: 14px; }
@@ -291,7 +293,12 @@ if (isset($_GET['ajax_pagination'])) {
         table { width: 100%; border-collapse: collapse; font-size: 13px; }
         th { text-align: left; padding: 10px; border-bottom: 1px solid var(--border-color); color: var(--text-secondary); font-weight: 600; text-transform: uppercase; font-size: 11px; }
         td { padding: 10px; border-bottom: 1px solid #eee; vertical-align: middle; }
-        
+        tr:nth-child(even) td { background: #fafbfc; }
+        tr:hover td { background: #f0f7ff; border-left: 3px solid var(--brand-color); }
+        tr:hover td:first-child { border-left: 3px solid var(--brand-color); }
+        tr:hover td:not(:first-child) { border-left: none; }
+        thead th { position: sticky; top: 0; background: white; z-index: 2; }
+
         /* Pagination */
         .pagination { padding: 15px; border-top: 1px solid #eee; display: flex; justify-content: flex-end; align-items: center; gap: 10px; font-size: 13px; }
         .pagination a { text-decoration: none; padding: 6px 12px; border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-main); transition: 0.2s; }
