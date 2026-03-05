@@ -33,10 +33,22 @@ if (isset($_SESSION['last_activity'])) {
 $_SESSION['last_activity'] = time();
 
 // 3. SECURITY HEADERS
-// Beschermt tegen clickjacking en MIME-type sniffing
 header("X-Frame-Options: DENY");
 header("X-Content-Type-Options: nosniff");
 header("Referrer-Policy: strict-origin-when-cross-origin");
+header("Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com https://fonts.googleapis.com; img-src 'self' https://i.imgur.com data:; connect-src 'self';");
+
+// 4. PROXY-SAFE IP HELPER
+function get_client_ip() {
+    if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+        $ips = array_map('trim', explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']));
+        return filter_var($ips[0], FILTER_VALIDATE_IP) ?: $_SERVER['REMOTE_ADDR'];
+    }
+    if (!empty($_SERVER['HTTP_X_REAL_IP'])) {
+        return filter_var($_SERVER['HTTP_X_REAL_IP'], FILTER_VALIDATE_IP) ?: $_SERVER['REMOTE_ADDR'];
+    }
+    return $_SERVER['REMOTE_ADDR'];
+}
 
 // --- BESTAANDE CONFIGURATIE ---
 

@@ -10,23 +10,30 @@ if (isset($_SESSION['user_id']) && empty($_POST)) {
 }
 
 $error_message = "";
-$login_success = false;
 
 // --- FUNCTIES VOOR BRUTE FORCE PROTECTION ---
 
 function checkLoginAttempts($pdo, $ip) {
-    // Verwijder blokkades ouder dan 15 minuten
-    $pdo->query("DELETE FROM login_attempts WHERE last_attempt_at < (NOW() - INTERVAL 15 MINUTE)");
+    // Cleanup alleen 1x per 100 requests (niet bij elke login poging)
+    if (random_int(1, 100) === 1) {
+        $pdo->query("DELETE FROM login_attempts WHERE last_attempt_at < (NOW() - INTERVAL 15 MINUTE)");
+    }
 
     $stmt = $pdo->prepare("SELECT * FROM login_attempts WHERE ip_address = ?");
     $stmt->execute([$ip]);
     $attempt = $stmt->fetch();
 
+    // Check of record verlopen is (> 15 min)
+    if ($attempt && strtotime($attempt['last_attempt_at']) < time() - 900) {
+        $pdo->prepare("DELETE FROM login_attempts WHERE ip_address = ?")->execute([$ip]);
+        return true;
+    }
+
     // Blokkeer na 5 pogingen
     if ($attempt && $attempt['attempts'] >= 5) {
-        return false; // Gebruiker is geblokkeerd
+        return false;
     }
-    return true; // Gebruiker mag proberen
+    return true;
 }
 
 function recordFailedLogin($pdo, $ip) {
@@ -51,7 +58,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     
     verify_csrf();
     
-    $ip_address = $_SERVER['REMOTE_ADDR'];
+    $ip_address = get_client_ip();
 
     // 1. Check of IP geblokkeerd is
     if (!checkLoginAttempts($pdo, $ip_address)) {
@@ -87,8 +94,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         $logStmt->execute([$user['id'], $ip_address]);
                     } catch(PDOException $e) { /* Negeer log fout */ }
 
-                    $login_success = true;
-                    
+                    header("Location: dashboard.php");
+                    exit;
+
                 } else {
                     // 3. Login Mislukt
                     recordFailedLogin($pdo, $ip_address);
@@ -130,24 +138,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         .alert-danger { background-color: var(--danger-bg); color: var(--danger-text); border: 1px solid var(--danger-border); }
         .alert-warning { background-color: var(--warning-bg); color: var(--warning-text); border: 1px solid #fcd34d; }
         .footer-text { margin-top: 24px; font-size: 12px; color: var(--text-secondary); }
-        .spinner-container { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; }
-        .spinner { width: 50px; height: 50px; border: 5px solid #f3f3f3; border-top: 5px solid var(--brand-color); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .success-text { font-size: 16px; font-weight: 600; color: var(--brand-color); animation: fadeIn 0.5s ease-in; }
     </style>
 </head>
 <body>
 
 <div class="login-card">
     
-    <?php if ($login_success): ?>
-        <div class="spinner-container">
-            <div class="spinner"></div>
-            <div class="success-text">Succesvol ingelogd!</div>
-            <div style="font-size: 13px; color: #999; margin-top: 8px;">Je wordt doorgestuurd...</div>
-        </div>
-        <script>setTimeout(function() { window.location.href = "dashboard.php"; }, 1500);</script>
-    <?php else: ?>
         <div style="width: 100%;">
             <div class="app-logo">
                 <span class="material-icons-outlined" style="font-size: 28px; color: var(--brand-color);">local_shipping</span>
@@ -191,7 +187,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 &copy; <?php echo date('Y'); ?> <?php echo defined('APP_TITLE') ? APP_TITLE : 'FeedbackFlow'; ?>
             </div>
         </div>
-    <?php endif; ?>
 
 </div>
 
