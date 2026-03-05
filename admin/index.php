@@ -81,6 +81,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             header("Location: index.php?msg=form_deleted&tab=dossiers"); exit;
         } catch (Exception $e) { $error = $e->getMessage(); $activeTab = 'dossiers'; }
     }
+
+    // E. BULK DOSSIERS VERWIJDEREN
+    if (isset($_POST['action']) && $_POST['action'] === 'bulk_delete_forms') {
+        try {
+            $ids = $_POST['form_ids'] ?? [];
+            if (empty($ids)) throw new Exception("Geen dossiers geselecteerd.");
+            $ids = array_map('intval', $ids);
+            $placeholders = implode(',', array_fill(0, count($ids), '?'));
+            $stmt = $pdo->prepare("DELETE FROM feedback_forms WHERE id IN ($placeholders)");
+            $stmt->execute($ids);
+            $count = $stmt->rowCount();
+            header("Location: index.php?msg=bulk_deleted&count=$count&tab=dossiers"); exit;
+        } catch (Exception $e) { $error = $e->getMessage(); $activeTab = 'dossiers'; }
+    }
 }
 
 // 3. DATA OPHALEN
@@ -96,12 +110,61 @@ $userStats = $pdo->query($statsQuery)->fetchAll();
 // B. Gebruikers
 $users = $pdo->query("SELECT * FROM users ORDER BY created_at DESC")->fetchAll();
 
-// C. Alle Dossiers (voor het dossier tabblad)
-$forms = $pdo->query("SELECT f.id, f.form_date, f.status, d.name as driver_name, d.employee_id, u.email as creator_email 
-                      FROM feedback_forms f 
-                      JOIN drivers d ON f.driver_id = d.id 
-                      LEFT JOIN users u ON f.created_by_user_id = u.id 
-                      ORDER BY f.created_at DESC")->fetchAll();
+// C. Dossiers met filters & paginering
+$dossierSearch = trim($_GET['ds'] ?? '');
+$dossierStatus = $_GET['dstatus'] ?? '';
+$dossierDateFrom = $_GET['dfrom'] ?? '';
+$dossierDateTo = $_GET['dto'] ?? '';
+$dossierPage = max(1, (int)($_GET['dpage'] ?? 1));
+$dossierLimit = 15;
+$dossierOffset = ($dossierPage - 1) * $dossierLimit;
+
+$dossierWhere = [];
+$dossierParams = [];
+
+if ($dossierSearch !== '') {
+    $dossierWhere[] = "(d.name LIKE ? OR d.employee_id LIKE ? OR u.email LIKE ?)";
+    $dossierParams[] = "%$dossierSearch%";
+    $dossierParams[] = "%$dossierSearch%";
+    $dossierParams[] = "%$dossierSearch%";
+}
+if ($dossierStatus !== '') {
+    $dossierWhere[] = "f.status = ?";
+    $dossierParams[] = $dossierStatus;
+}
+if ($dossierDateFrom !== '') {
+    $dossierWhere[] = "f.form_date >= ?";
+    $dossierParams[] = $dossierDateFrom;
+}
+if ($dossierDateTo !== '') {
+    $dossierWhere[] = "f.form_date <= ?";
+    $dossierParams[] = $dossierDateTo;
+}
+
+$dossierWhereSQL = $dossierWhere ? 'WHERE ' . implode(' AND ', $dossierWhere) : '';
+$dossierBaseSQL = "FROM feedback_forms f
+                   JOIN drivers d ON f.driver_id = d.id
+                   LEFT JOIN users u ON f.created_by_user_id = u.id
+                   $dossierWhereSQL";
+
+$stmtCount = $pdo->prepare("SELECT COUNT(*) $dossierBaseSQL");
+$stmtCount->execute($dossierParams);
+$dossierTotal = $stmtCount->fetchColumn();
+$dossierTotalPages = max(1, ceil($dossierTotal / $dossierLimit));
+if ($dossierPage > $dossierTotalPages) $dossierPage = $dossierTotalPages;
+
+$stmtForms = $pdo->prepare("SELECT f.id, f.form_date, f.status, d.name as driver_name, d.employee_id, u.email as creator_email
+                             $dossierBaseSQL ORDER BY f.created_at DESC LIMIT $dossierLimit OFFSET $dossierOffset");
+$stmtForms->execute($dossierParams);
+$forms = $stmtForms->fetchAll();
+
+// Helper: bouw dossier-paginering link met huidige filters
+function dossier_page_link($page) {
+    $params = $_GET;
+    $params['dpage'] = $page;
+    $params['tab'] = 'dossiers';
+    return 'index.php?' . http_build_query($params);
+}
 
 // Meldingen
 if (isset($_GET['msg'])) {
@@ -109,6 +172,7 @@ if (isset($_GET['msg'])) {
     if ($_GET['msg'] == 'updated') $msg = "Gebruiker gewijzigd.";
     if ($_GET['msg'] == 'deleted') $msg = "Gebruiker verwijderd.";
     if ($_GET['msg'] == 'form_deleted') $msg = "Dossier definitief verwijderd.";
+    if ($_GET['msg'] == 'bulk_deleted') $msg = ($_GET['count'] ?? 0) . " dossier(s) definitief verwijderd.";
 }
 ?>
 <!DOCTYPE html>
@@ -191,6 +255,25 @@ if (isset($_GET['msg'])) {
         .form-control { width: 100%; padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 14px; }
         .modal-footer { padding: 16px 20px; background: #f8f9fa; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 10px; }
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+
+        /* Filter Bar */
+        .filter-bar { padding: 12px 16px; }
+        .filter-form { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .filter-group { display: flex; align-items: center; gap: 6px; }
+        .filter-input { padding: 6px 10px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 13px; width: 220px; }
+        .filter-input:focus { border-color: var(--brand-color); outline: none; }
+        .filter-select { padding: 6px 10px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 13px; background: white; }
+        .filter-date { padding: 6px 8px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 12px; width: 130px; }
+
+        /* Dossier Pagination */
+        .dossier-pagination { padding: 15px 16px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #eee; }
+        .page-link { text-decoration: none; padding: 6px 12px; border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-main); font-size: 13px; background: white; transition: 0.2s; }
+        .page-link:hover { background: #f3f2f2; }
+        .page-link.disabled, span.page-link.disabled { opacity: 0.5; pointer-events: none; }
+
+        /* Checkbox styling */
+        .row-check, #selectAll { width: 16px; height: 16px; cursor: pointer; accent-color: var(--brand-color); }
+        tr:has(.row-check:checked) { background-color: #f0f7ff; }
     </style>
 </head>
 <body>
@@ -289,14 +372,59 @@ if (isset($_GET['msg'])) {
             </div>
 
             <div id="tab-dossiers" class="tab-content <?php echo ($activeTab === 'dossiers') ? 'active' : ''; ?>">
-                <div class="card">
-                    <div class="card-header">
-                        Overzicht dossiers (definitief verwijderen)
+
+                <!-- Filter bar -->
+                <div class="card" style="margin-bottom: 16px;">
+                    <div class="filter-bar">
+                        <form method="GET" class="filter-form">
+                            <input type="hidden" name="tab" value="dossiers">
+                            <div class="filter-group">
+                                <span class="material-icons-outlined" style="font-size:18px; color:var(--text-secondary);">search</span>
+                                <input type="text" name="ds" value="<?php echo htmlspecialchars($dossierSearch); ?>" placeholder="Zoek chauffeur, ID of e-mail..." class="filter-input">
+                            </div>
+                            <div class="filter-group">
+                                <select name="dstatus" class="filter-select">
+                                    <option value="">Alle statussen</option>
+                                    <option value="open" <?php echo $dossierStatus === 'open' ? 'selected' : ''; ?>>Open</option>
+                                    <option value="completed" <?php echo $dossierStatus === 'completed' ? 'selected' : ''; ?>>Afgerond</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <input type="date" name="dfrom" value="<?php echo htmlspecialchars($dossierDateFrom); ?>" class="filter-date" title="Vanaf datum">
+                                <span style="color:var(--text-secondary); font-size:12px;">t/m</span>
+                                <input type="date" name="dto" value="<?php echo htmlspecialchars($dossierDateTo); ?>" class="filter-date" title="Tot datum">
+                            </div>
+                            <button type="submit" class="btn btn-brand" style="padding:6px 14px;">
+                                <span class="material-icons-outlined" style="font-size:16px;">filter_list</span> Filter
+                            </button>
+                            <?php if ($dossierSearch || $dossierStatus || $dossierDateFrom || $dossierDateTo): ?>
+                                <a href="index.php?tab=dossiers" class="btn" style="padding:6px 14px; background:#fff; border:1px solid var(--border-color); color:var(--text-secondary); font-size:12px;">
+                                    <span class="material-icons-outlined" style="font-size:14px;">close</span> Reset
+                                </a>
+                            <?php endif; ?>
+                        </form>
                     </div>
+                </div>
+
+                <!-- Resultaat info + bulk actie -->
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                    <div style="font-size:13px; color:var(--text-secondary);">
+                        <strong><?php echo $dossierTotal; ?></strong> dossier<?php echo $dossierTotal !== 1 ? 's' : ''; ?> gevonden
+                    </div>
+                    <button type="button" id="bulkDeleteBtn" class="btn" style="padding:6px 14px; background:var(--danger-bg); color:var(--danger-text); border:1px solid #fca5a5; display:none; font-size:12px;" onclick="submitBulkDelete()">
+                        <span class="material-icons-outlined" style="font-size:16px;">delete_sweep</span>
+                        <span id="bulkDeleteCount">0</span> verwijderen
+                    </button>
+                </div>
+
+                <form method="POST" id="bulkDeleteForm">
+                    <input type="hidden" name="action" value="bulk_delete_forms">
+                <div class="card">
                     <div style="overflow-x: auto;">
                         <table>
                             <thead>
                                 <tr>
+                                    <th style="width:40px;"><input type="checkbox" id="selectAll" title="Alles selecteren"></th>
                                     <th>Datum</th>
                                     <th>Chauffeur</th>
                                     <th>DriverID</th>
@@ -306,8 +434,17 @@ if (isset($_GET['msg'])) {
                                 </tr>
                             </thead>
                             <tbody>
+                                <?php if (empty($forms)): ?>
+                                <tr>
+                                    <td colspan="7" style="text-align:center; padding:30px; color:var(--text-secondary);">
+                                        <span class="material-icons-outlined" style="font-size:40px; display:block; margin-bottom:8px; color:#ddd;">search_off</span>
+                                        Geen dossiers gevonden met deze filters.
+                                    </td>
+                                </tr>
+                                <?php else: ?>
                                 <?php foreach ($forms as $form): ?>
                                 <tr>
+                                    <td><input type="checkbox" name="form_ids[]" value="<?php echo $form['id']; ?>" class="row-check"></td>
                                     <td><?php echo date('d-m-Y', strtotime($form['form_date'])); ?></td>
                                     <td><strong><?php echo htmlspecialchars($form['driver_name']); ?></strong></td>
                                     <td><?php echo htmlspecialchars($form['employee_id']); ?></td>
@@ -328,10 +465,34 @@ if (isset($_GET['msg'])) {
                                     </td>
                                 </tr>
                                 <?php endforeach; ?>
+                                <?php endif; ?>
                             </tbody>
                         </table>
                     </div>
+
+                    <?php if ($dossierTotalPages > 1): ?>
+                    <div class="dossier-pagination">
+                        <div>
+                            <?php if ($dossierPage > 1): ?>
+                                <a href="<?php echo dossier_page_link($dossierPage - 1); ?>" class="page-link">&laquo; Vorige</a>
+                            <?php else: ?>
+                                <span class="page-link disabled">&laquo; Vorige</span>
+                            <?php endif; ?>
+                        </div>
+                        <div style="font-size:13px; color:var(--text-secondary);">
+                            Pagina <strong><?php echo $dossierPage; ?></strong> van <strong><?php echo $dossierTotalPages; ?></strong>
+                        </div>
+                        <div>
+                            <?php if ($dossierPage < $dossierTotalPages): ?>
+                                <a href="<?php echo dossier_page_link($dossierPage + 1); ?>" class="page-link">Volgende &raquo;</a>
+                            <?php else: ?>
+                                <span class="page-link disabled">Volgende &raquo;</span>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <?php endif; ?>
                 </div>
+                </form>
             </div>
 
             <div id="tab-stats" class="tab-content <?php echo ($activeTab === 'stats') ? 'active' : ''; ?>">
@@ -490,6 +651,36 @@ if (isset($_GET['msg'])) {
             if (event.target == modal) {
                 closeModal();
             }
+        }
+
+        // --- BULK SELECT LOGICA ---
+        const selectAll = document.getElementById('selectAll');
+        const bulkBtn = document.getElementById('bulkDeleteBtn');
+        const bulkCount = document.getElementById('bulkDeleteCount');
+        const rowChecks = document.querySelectorAll('.row-check');
+
+        function updateBulkUI() {
+            const checked = document.querySelectorAll('.row-check:checked');
+            const count = checked.length;
+            bulkBtn.style.display = count > 0 ? 'inline-flex' : 'none';
+            bulkCount.textContent = count;
+            selectAll.checked = rowChecks.length > 0 && count === rowChecks.length;
+            selectAll.indeterminate = count > 0 && count < rowChecks.length;
+        }
+
+        if (selectAll) {
+            selectAll.addEventListener('change', function() {
+                rowChecks.forEach(cb => cb.checked = this.checked);
+                updateBulkUI();
+            });
+        }
+        rowChecks.forEach(cb => cb.addEventListener('change', updateBulkUI));
+
+        function submitBulkDelete() {
+            const checked = document.querySelectorAll('.row-check:checked');
+            if (checked.length === 0) return;
+            if (!confirm('PAS OP: Je staat op het punt ' + checked.length + ' dossier(s) definitief te verwijderen. Dit kan niet ongedaan worden gemaakt. Doorgaan?')) return;
+            document.getElementById('bulkDeleteForm').submit();
         }
     </script>
 </body>
