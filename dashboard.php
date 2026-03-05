@@ -82,6 +82,24 @@ try {
 } catch (PDOException $e) {}
 
 $teamleads = $pdo->query("SELECT id, email, first_name, last_name FROM users ORDER BY first_name ASC")->fetchAll();
+
+// 5. RECENTE NOTITIES
+$recentNotes = [];
+try {
+    $sqlNotes = "SELECT n.id, n.content, n.note_date, n.driver_id,
+                        d.name as driver_name,
+                        u.first_name, u.last_name, u.email as user_email,
+                        f.id as form_id
+                 FROM notes n
+                 JOIN drivers d ON n.driver_id = d.id
+                 LEFT JOIN users u ON n.user_id = u.id
+                 LEFT JOIN feedback_forms f ON f.driver_id = n.driver_id
+                 GROUP BY n.id
+                 ORDER BY n.note_date DESC
+                 LIMIT 5";
+    $recentNotes = $pdo->query($sqlNotes)->fetchAll();
+} catch (PDOException $e) {}
+
 $msg = $_GET['msg'] ?? '';
 
 // --- PAGINERING LOGICA ---
@@ -292,6 +310,17 @@ if (isset($_GET['ajax_pagination'])) {
         .inline-select { padding: 4px; border: 1px solid #ccc; border-radius: 4px; font-size: 12px; }
         .text-urgent { color: #c53030; font-weight: 700; }
 
+        /* Recente Berichten */
+        .recent-notes-list { display: flex; flex-direction: column; }
+        .note-row { display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; border-bottom: 1px solid #f0f0f0; text-decoration: none; color: inherit; transition: background 0.15s; }
+        .note-row:last-child { border-bottom: none; }
+        .note-row:hover { background: #f8faff; }
+        .note-avatar { width: 34px; height: 34px; background: linear-gradient(135deg, var(--brand-color), #014486); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; }
+        .note-body { flex: 1; min-width: 0; }
+        .note-meta { font-size: 12px; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-bottom: 4px; }
+        .note-time { margin-left: auto; color: var(--text-secondary); font-size: 11px; white-space: nowrap; }
+        .note-content { font-size: 13px; color: var(--text-secondary); line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
         /* SEARCH OVERLAY (POPUP) */
         #search-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 9999; display: none; justify-content: center; padding-top: 15vh; backdrop-filter: blur(2px); }
         .spotlight-container { width: 100%; max-width: 600px; background: white; border-radius: 8px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); overflow: hidden; display: flex; flex-direction: column; max-height: 60vh; animation: slideDown 0.2s ease-out; }
@@ -416,6 +445,51 @@ if (isset($_GET['ajax_pagination'])) {
                 <div class="card-body">
                     <div id="chart-container"></div>
                 </div>
+            </div>
+
+            <div class="card">
+                <div class="filter-toolbar" style="justify-content:space-between; align-items:center;">
+                    <div style="font-weight:700; font-size:14px;">Recente berichten</div>
+                </div>
+                <?php if (empty($recentNotes)): ?>
+                    <div style="padding:30px; text-align:center; color:var(--text-secondary); font-size:13px;">
+                        Nog geen berichten geplaatst.
+                    </div>
+                <?php else: ?>
+                    <div class="recent-notes-list">
+                        <?php foreach ($recentNotes as $note):
+                            $authorName = (!empty($note['first_name']) || !empty($note['last_name']))
+                                ? trim($note['first_name'] . ' ' . $note['last_name'])
+                                : $note['user_email'];
+                            $timeAgo = '';
+                            $noteDate = new DateTime($note['note_date']);
+                            $now = new DateTime();
+                            $diff = $now->diff($noteDate);
+                            if ($diff->days === 0) {
+                                $timeAgo = 'Vandaag ' . $noteDate->format('H:i');
+                            } elseif ($diff->days === 1) {
+                                $timeAgo = 'Gisteren ' . $noteDate->format('H:i');
+                            } elseif ($diff->days < 7) {
+                                $timeAgo = $diff->days . ' dagen geleden';
+                            } else {
+                                $timeAgo = $noteDate->format('d-m-Y H:i');
+                            }
+                        ?>
+                        <a href="feedback_view.php?id=<?php echo $note['form_id']; ?>" class="note-row">
+                            <div class="note-avatar"><?php echo strtoupper(substr($authorName, 0, 1)); ?></div>
+                            <div class="note-body">
+                                <div class="note-meta">
+                                    <strong><?php echo htmlspecialchars($authorName); ?></strong>
+                                    <span style="color:var(--text-secondary);">over</span>
+                                    <span style="color:var(--brand-color); font-weight:600;"><?php echo htmlspecialchars($note['driver_name']); ?></span>
+                                    <span class="note-time"><?php echo $timeAgo; ?></span>
+                                </div>
+                                <div class="note-content"><?php echo htmlspecialchars(mb_strimwidth($note['content'], 0, 120, '...')); ?></div>
+                            </div>
+                        </a>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
             </div>
 
         </div>
