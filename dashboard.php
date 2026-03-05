@@ -405,49 +405,6 @@ if (isset($_GET['ajax_pagination'])) {
 </div>
 
             <div class="card">
-                <div class="filter-toolbar" style="justify-content: space-between; align-items: center;">
-    <h3 style="margin: 0; font-size: 18px; color: var(--brand-dark);">Recente dossiers</h3>
-    
-    <a href="feedback_form.php" style="background-color: var(--brand-color); color: white; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px;">
-        <span class="material-icons-outlined" style="font-size: 18px;">add</span>
-        nieuw
-    </a>
-</div>
-
-                <div style="overflow-x: auto;">
-                    <table style="width: 100%;">
-                        <thead>
-                            <tr>
-                                <th>Datum</th>
-                                <th>Chauffeur</th>
-                                <th>Moment</th>
-                                <th>Gemaakt door</th>
-                                <th>Status</th>
-                                <th>Toegewezen aan</th>
-                                <th style="text-align:right;">Actie</th>
-                            </tr>
-                        </thead>
-                        <tbody id="feedback-table-body">
-                            <?php echo $rowsHtml; ?>
-                        </tbody>
-                    </table>
-                </div>
-
-                <div class="pagination" id="pagination-container">
-                    <?php echo $paginationHtml; ?>
-                </div>
-            </div>
-
-            <div class="card">
-                <div class="filter-toolbar">
-                    <div style="font-weight:700; font-size:14px;">Aantal dossiers per week</div>
-                </div>
-                <div class="card-body">
-                    <div id="chart-container"></div>
-                </div>
-            </div>
-
-            <div class="card">
                 <div class="filter-toolbar" style="justify-content:space-between; align-items:center;">
                     <div style="font-weight:700; font-size:14px;">Recente berichten</div>
                 </div>
@@ -490,6 +447,49 @@ if (isset($_GET['ajax_pagination'])) {
                         <?php endforeach; ?>
                     </div>
                 <?php endif; ?>
+            </div>
+
+            <div class="card">
+                <div class="filter-toolbar" style="justify-content: space-between; align-items: center;">
+    <h3 style="margin: 0; font-size: 18px; color: var(--brand-dark);">Recente dossiers</h3>
+    
+    <a href="feedback_form.php" style="background-color: var(--brand-color); color: white; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+        <span class="material-icons-outlined" style="font-size: 18px;">add</span>
+        nieuw
+    </a>
+</div>
+
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%;">
+                        <thead>
+                            <tr>
+                                <th>Datum</th>
+                                <th>Chauffeur</th>
+                                <th>Moment</th>
+                                <th>Gemaakt door</th>
+                                <th>Status</th>
+                                <th>Toegewezen aan</th>
+                                <th style="text-align:right;">Actie</th>
+                            </tr>
+                        </thead>
+                        <tbody id="feedback-table-body">
+                            <?php echo $rowsHtml; ?>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="pagination" id="pagination-container">
+                    <?php echo $paginationHtml; ?>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="filter-toolbar">
+                    <div style="font-weight:700; font-size:14px;">Aantal dossiers per week</div>
+                </div>
+                <div class="card-body">
+                    <div id="chart-container"></div>
+                </div>
             </div>
 
         </div>
