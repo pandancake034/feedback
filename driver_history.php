@@ -181,6 +181,9 @@ try {
             <?php endif; ?>
 
         </div>
+
+        <?php include __DIR__ . '/includes/footer.php'; ?>
+
     </main>
 </body>
 </html>

@@ -260,14 +260,7 @@ function getInitials($name) {
 </head>
 <body>
 
-    <aside class="sidebar">
-        <div style="padding: 20px; font-weight: 700; background: rgba(0,0,0,0.2);">FeedbackFlow</div>
-        <div style="padding: 20px;">
-            <a href="dashboard.php" style="color: #b0b6c3; text-decoration: none; display: flex; align-items: center; gap: 10px;">
-                <span class="material-icons-outlined">arrow_back</span> Terug
-            </a>
-        </div>
-    </aside>
+    <?php include __DIR__ . '/includes/sidebar.php'; ?>
 
     <main class="main-content">
         

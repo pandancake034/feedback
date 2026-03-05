@@ -260,16 +260,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 </head>
 <body>
 
-    <aside class="sidebar">
-        <div style="height: 60px; display: flex; align-items: center; padding: 0 20px; font-weight: 700; background: rgba(0,0,0,0.2);">FeedbackFlow</div>
-        <div style="padding: 20px;">
-            <a href="dashboard.php" style="color: #b0b6c3; text-decoration: none; display: flex; align-items: center; gap: 10px;">
-                <span class="material-icons-outlined">dashboard</span> Terug naar dashboard
-            </a>
-        </div>
-    </aside>
+    <?php include __DIR__ . '/includes/sidebar.php'; ?>
 
     <main class="main-content">
+        <?php include __DIR__ . '/includes/header.php'; ?>
+
         <div class="page-body">
             
             <form method="POST">
@@ -436,8 +431,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 
             </form>
         </div>
+
+        <?php include __DIR__ . '/includes/footer.php'; ?>
+
     </main>
-    
+
     <script>
         // 1. WISSELEN FORM TYPE
         function toggleFormType() {

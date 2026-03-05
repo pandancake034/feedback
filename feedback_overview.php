@@ -336,6 +336,9 @@ function get_page_link($pageNum) {
                 <?php endif; ?>
             </div>
         </div>
+
+        <?php include __DIR__ . '/includes/footer.php'; ?>
+
     </main>
 
     <script>

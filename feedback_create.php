@@ -218,13 +218,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 </div>
             </form>
         </div>
-    </main>
 
     <script>
         function toggleMode(mode) {
             const blockExisting = document.getElementById('block-existing');
             const blockNew = document.getElementById('block-new');
-            
+
             if (mode === 'new') {
                 blockExisting.style.display = 'none';
                 blockNew.style.display = 'block';
@@ -241,6 +240,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             }
         }
     </script>
+
+        <?php include __DIR__ . '/includes/footer.php'; ?>
+
+    </main>
 
 </body>
 </html>

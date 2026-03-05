@@ -152,7 +152,6 @@ $chartDataFTR = [
             </div>
             
         </div>
-    </main>
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
@@ -204,11 +203,16 @@ $chartDataFTR = [
             };
 
             option && myChart.setOption(option);
-            
+
             window.addEventListener('resize', function() {
                 myChart.resize();
             });
         });
     </script>
+
+        <?php include __DIR__ . '/includes/footer.php'; ?>
+
+    </main>
+
 </body>
 </html>

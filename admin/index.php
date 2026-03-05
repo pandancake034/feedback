@@ -195,32 +195,10 @@ if (isset($_GET['msg'])) {
 </head>
 <body>
 
-    <aside class="sidebar">
-        <div class="sidebar-header bg-white flex items-center justify-center p-4">
-            <img src="https://i.imgur.com/qGySlgO.png" alt="LogistiekApp" class="sidebar-logo">
-        </div>
-        <ul class="nav-list">
-            <li class="nav-item">
-                <a href="../dashboard.php">
-                    <span class="material-icons-outlined">dashboard</span> Dashboard
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="index.php" class="active">
-                    <span class="material-icons-outlined">admin_panel_settings</span> Beheer & admin
-                </a>
-            </li>
-        </ul>
-    </aside>
+    <?php include __DIR__ . '/../includes/sidebar.php'; ?>
 
     <main class="main-content">
-        <header class="top-header">
-            <div style="font-size: 13px; font-weight: 600; display:flex; align-items:center; gap:8px;">
-                <span class="material-icons-outlined">account_circle</span>
-                <?php echo htmlspecialchars($_SESSION['email']); ?> (admin)
-                <a href="../logout.php" style="margin-left:15px; color:var(--text-secondary); text-decoration:none;"><span class="material-icons-outlined">logout</span></a>
-            </div>
-        </header>
+        <?php include __DIR__ . '/../includes/header.php'; ?>
 
         <div class="page-body">
             
@@ -378,6 +356,9 @@ if (isset($_GET['msg'])) {
             </div>
 
         </div>
+
+        <?php include __DIR__ . '/../includes/footer.php'; ?>
+
     </main>
 
     <div id="userModal" class="modal-overlay">
