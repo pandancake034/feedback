@@ -12,6 +12,24 @@ require_once __DIR__ . '/includes/helpers.php';
 // Check login
 if (!isset($_SESSION['user_id'])) { header("Location: login.php"); exit; }
 
+// AJAX: Vorige gesprekken ophalen voor een chauffeur
+if (isset($_GET['ajax_prev_forms'])) {
+    $driverId = (int)$_GET['ajax_prev_forms'];
+    $excludeId = isset($_GET['exclude']) ? (int)$_GET['exclude'] : 0;
+    $sql = "SELECT id, form_date, review_moment FROM feedback_forms WHERE driver_id = ?";
+    $params = [$driverId];
+    if ($excludeId) {
+        $sql .= " AND id != ?";
+        $params[] = $excludeId;
+    }
+    $sql .= " ORDER BY form_date DESC";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    header('Content-Type: application/json');
+    echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+    exit;
+}
+
 // --- 1. INITIALISATIE ---
 $form_id = $_GET['id'] ?? null;
 $is_new  = empty($form_id);
@@ -403,7 +421,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                 </div>
                                 <div class="form-group">
                                     <label>Vorig gesprek (Referentie)</label>
-                                    <select name="linked_form_id">
+                                    <select name="linked_form_id" id="linked_form_id">
                                         <option value="">-- Geen --</option>
                                         <?php foreach($prev_forms as $pf): ?>
                                             <option value="<?php echo $pf['id']; ?>" <?php if($data['linked_form_id'] == $pf['id']) echo 'selected'; ?>>
@@ -507,10 +525,52 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         if (otdInput) otdInput.addEventListener('blur', function() { formatPercentage(this); });
         if (ftrInput) ftrInput.addEventListener('blur', function() { formatPercentage(this); });
 
+        // 5. DYNAMISCH REFERENTIE DROPDOWN LADEN
+        function loadPrevForms() {
+            const driverSelect = document.querySelector('[name="existing_driver_id"]');
+            if (!driverSelect) return;
+            const driverId = driverSelect.value;
+            const refSelect = document.getElementById('linked_form_id');
+            if (!refSelect) return;
+
+            const formId = <?php echo json_encode($form_id ?: 0); ?>;
+            const excludeParam = formId ? '&exclude=' + formId : '';
+
+            if (!driverId) {
+                refSelect.innerHTML = '<option value="">-- Geen --</option>';
+                return;
+            }
+
+            fetch('feedback_form.php?ajax_prev_forms=' + driverId + excludeParam)
+                .then(r => r.json())
+                .then(forms => {
+                    const selected = refSelect.value;
+                    refSelect.innerHTML = '<option value="">-- Geen --</option>';
+                    forms.forEach(f => {
+                        const d = new Date(f.form_date);
+                        const label = d.toLocaleDateString('nl-NL', {day:'2-digit', month:'2-digit', year:'numeric'})
+                            + ' - ' + (f.review_moment || 'Geen type');
+                        const opt = document.createElement('option');
+                        opt.value = f.id;
+                        opt.textContent = label;
+                        if (f.id == selected) opt.selected = true;
+                        refSelect.appendChild(opt);
+                    });
+                });
+        }
+
         // Init
         window.addEventListener('DOMContentLoaded', () => {
             toggleFormType();
             renderSkills();
+
+            // Luister naar chauffeur wijziging voor referentie dropdown
+            const driverSelect = document.querySelector('[name="existing_driver_id"]');
+            if (driverSelect) {
+                driverSelect.addEventListener('change', loadPrevForms);
+                // Bij prefill meteen laden
+                if (driverSelect.value) loadPrevForms();
+            }
         });
     </script>
 </body>
