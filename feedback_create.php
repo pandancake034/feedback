@@ -15,6 +15,17 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
+// AJAX: Vorige gesprekken ophalen voor een chauffeur
+if (isset($_GET['ajax_prev_forms'])) {
+    $driverId = (int)$_GET['ajax_prev_forms'];
+    $stmt = $pdo->prepare("SELECT id, form_date, review_moment FROM feedback_forms WHERE driver_id = ? ORDER BY form_date DESC");
+    $stmt->execute([$driverId]);
+    $forms = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    header('Content-Type: application/json');
+    echo json_encode($forms);
+    exit;
+}
+
 // 2. DATA OPHALEN
 $drivers = [];
 $users   = []; 
@@ -66,10 +77,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
         // STAP B: Maak het formulier aan
         $sql = "INSERT INTO feedback_forms (
-                    driver_id, created_by_user_id, assigned_to_user_id, 
-                    form_date, start_date, agency, status
-                ) VALUES (?, ?, ?, ?, ?, ?, 'open')";
-        
+                    driver_id, created_by_user_id, assigned_to_user_id,
+                    form_date, start_date, agency, linked_form_id, status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'open')";
+
         $stmt = $pdo->prepare($sql);
         $stmt->execute([
             $driver_id,
@@ -77,11 +88,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $_POST['assigned_to'] ?: NULL,
             $_POST['form_date'],
             $_POST['start_date'],
-            $_POST['agency']
+            $_POST['agency'],
+            !empty($_POST['linked_form_id']) ? $_POST['linked_form_id'] : NULL
         ]);
 
+        $new_form_id = $pdo->lastInsertId();
         $pdo->commit(); // Alles opslaan
-        header("Location: dashboard.php?msg=created");
+        header("Location: feedback_view.php?id=" . $new_form_id);
         exit;
 
     } catch (Exception $e) {
@@ -194,6 +207,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                             <input type="text" name="agency" value="YoungCapital">
                         </div>
 
+                        <div class="form-group" id="block-referentie" style="display: none;">
+                            <label>Vorig gesprek (Referentie)</label>
+                            <select name="linked_form_id" id="linked_form_id">
+                                <option value="">-- Geen --</option>
+                            </select>
+                        </div>
+
                     </div>
 
                     <h3 class="form-section-title">2. Planning</h3>
@@ -231,22 +251,64 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         function toggleMode(mode) {
             const blockExisting = document.getElementById('block-existing');
             const blockNew = document.getElementById('block-new');
+            const blockRef = document.getElementById('block-referentie');
 
             if (mode === 'new') {
                 blockExisting.style.display = 'none';
                 blockNew.style.display = 'block';
-                // Velden verplicht maken als ze zichtbaar zijn helpt browser validatie
+                blockRef.style.display = 'none';
                 document.querySelector('[name="new_driver_name"]').required = true;
                 document.querySelector('[name="new_employee_id"]').required = true;
                 document.querySelector('[name="driver_id"]').required = false;
+                // Reset referentie dropdown
+                document.getElementById('linked_form_id').innerHTML = '<option value="">-- Geen --</option>';
             } else {
                 blockExisting.style.display = 'block';
                 blockNew.style.display = 'none';
                 document.querySelector('[name="new_driver_name"]').required = false;
                 document.querySelector('[name="new_employee_id"]').required = false;
                 document.querySelector('[name="driver_id"]').required = true;
+                // Herlaad vorige gesprekken als er al een chauffeur geselecteerd is
+                loadPrevForms();
             }
         }
+
+        function loadPrevForms() {
+            const driverSelect = document.querySelector('[name="driver_id"]');
+            const driverId = driverSelect.value;
+            const refSelect = document.getElementById('linked_form_id');
+            const refBlock = document.getElementById('block-referentie');
+
+            if (!driverId) {
+                refBlock.style.display = 'none';
+                refSelect.innerHTML = '<option value="">-- Geen --</option>';
+                return;
+            }
+
+            fetch('feedback_create.php?ajax_prev_forms=' + driverId)
+                .then(r => r.json())
+                .then(forms => {
+                    refSelect.innerHTML = '<option value="">-- Geen --</option>';
+                    forms.forEach(f => {
+                        const d = new Date(f.form_date);
+                        const label = d.toLocaleDateString('nl-NL', {day:'2-digit', month:'2-digit', year:'numeric'})
+                            + ' - ' + (f.review_moment || 'Geen type');
+                        const opt = document.createElement('option');
+                        opt.value = f.id;
+                        opt.textContent = label;
+                        refSelect.appendChild(opt);
+                    });
+                    refBlock.style.display = forms.length > 0 ? 'block' : 'none';
+                });
+        }
+
+        // Laad vorige gesprekken bij wisselen van chauffeur
+        document.querySelector('[name="driver_id"]').addEventListener('change', loadPrevForms);
+
+        // Bij prefill: meteen laden
+        <?php if ($prefill_driver_id): ?>
+        document.addEventListener('DOMContentLoaded', loadPrevForms);
+        <?php endif; ?>
     </script>
 
         <?php include __DIR__ . '/includes/footer.php'; ?>
